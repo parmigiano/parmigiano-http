@@ -1,0 +1,20 @@
+[Unit]
+Description=Go HTTPs Server
+After=network.target
+
+[Service]
+ExecStart=/root/parmigiano-http/bin/server-http
+WorkingDirectory=/root/parmigiano-http
+Restart=always
+RestartSec=5s
+StartLimitBurst=10
+StartLimitIntervalSec=60
+User=root
+Group=root
+Environment="PORT=8080"
+LimitNOFILE=1048576
+
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target
