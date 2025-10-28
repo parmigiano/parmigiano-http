@@ -22,12 +22,12 @@ check: fmt lint test
 build:
 	@echo "==> Building main server (8080)..."
 	go build -ldflags="-s -w \
-		-X parmigiano/http/config.HttpServerPort=8080 \
+		-X parmigiano/http/config.HttpServerPort=8080" \
 		-o $(BINARY_MAIN) ./cmd/server
 
 	@echo "==> Building backup server (8181)..."
 	go build -ldflags="-s -w \
-		-X parmigiano/http/config.HttpServerPort=8181 \
+		-X parmigiano/http/config.HttpServerPort=8181" \
 		-o $(BINARY_RESERV) ./cmd/server
 
 test:

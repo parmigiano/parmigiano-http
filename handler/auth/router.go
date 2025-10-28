@@ -18,5 +18,8 @@ func (h *Handler) RegisterRoutes(router *mux.Router) {
 	authRouter.Handle("/create", httpx.ErrorHandler(h.AuthCreateUserHandler)).Methods(http.MethodPost)
 
 	// access: все
+	authRouter.Handle("/login", httpx.ErrorHandler(h.AuthLoginUserHandler)).Methods(http.MethodPost)
+
+	// access: все
 	authProtectedRouter.Handle("/delete", httpx.ErrorHandler(h.AuthDeleteHandler)).Methods(http.MethodDelete)
 }

@@ -2,9 +2,9 @@ package auth
 
 import (
 	"net/http"
-	"parmigiano/http/infra/types"
 	"parmigiano/http/pkg/httpx"
 	"parmigiano/http/pkg/httpx/httperr"
+	"parmigiano/http/types"
 )
 
 func (h *Handler) AuthDeleteHandler(w http.ResponseWriter, r *http.Request) error {

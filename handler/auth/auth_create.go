@@ -2,7 +2,7 @@ package auth
 
 import (
 	"fmt"
-	"parmigiano/http/infra/constants"
+	"parmigiano/http/infra/encryption"
 
 	"net/http"
 	"parmigiano/http/infra/store/postgres/models"
@@ -32,10 +32,10 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 			return httperr.BadRequest(httpx.ValidateMsg(err))
 		}
 
-		return httperr.BadRequest("not all fields are filled")
+		return httperr.BadRequest("не все поля заполнены")
 	}
 
-	token := util.HashTo255(fmt.Sprintf("%s:%s", payload.Email, time.Now().String()))
+	token := util.HashTo255(fmt.Sprintf("%s:%s:%s", payload.Username, payload.Email, time.Now().String()))
 
 	tx, err := h.Db.BeginTx(ctx, nil)
 	if err != nil {
@@ -48,30 +48,31 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	}()
 
 	uuid := uuid.NewString()
+	pass, err := encryption.Encrypt(payload.Password)
+	if err != nil {
+		h.Logger.Error("%v", err)
+		return httperr.InternalServerError(err.Error())
+	}
 
 	userCore := &models.UserCore{
 		UserUUID:    uuid,
 		Email:       payload.Email,
+		Password:    pass,
 		AccessToken: token,
 	}
 
-	if errUserCore := h.Store.Users.Create_UserCore(ctx, tx, userCore); errUserCore != nil {
+	if errUserCore := h.Store.Users.Create_UserCore(tx, ctx, userCore); errUserCore != nil {
 		h.Logger.Error("%v", errUserCore)
 		return httperr.Db(ctx, errUserCore)
 	}
 
-	userSubscriptionModel := &models.UserSubscription{
+	UserProfileModel := &models.UserProfile{
 		UserUUID: uuid,
-		PlanID:   constants.Free_Index,
-		IsActive: false,
+		Avatar:   nil,
+		Username: payload.Username,
 	}
 
-	if err := h.Store.Users.Create_UserSubscription(ctx, tx, userSubscriptionModel); err != nil {
-		h.Logger.Error("%v", err)
-		return httperr.Db(ctx, err)
-	}
-
-	if err := h.Store.Users.Create_UserUsage(ctx, tx, uuid); err != nil {
+	if err := h.Store.Users.Create_UserProfile(tx, ctx, UserProfileModel); err != nil {
 		h.Logger.Error("%v", err)
 		return httperr.Db(ctx, err)
 	}

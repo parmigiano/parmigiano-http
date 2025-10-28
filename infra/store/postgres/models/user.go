@@ -7,7 +7,7 @@ type UserProfile struct {
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 	UserUUID  string    `json:"user_uuid" db:"user_uuid"`
-	Avatar    []byte    `json:"avatar" db:"avatar"`
+	Avatar    *string   `json:"avatar" db:"avatar"`
 	Username  string    `json:"username" db:"username"`
 }
 
