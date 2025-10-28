@@ -1,8 +1,9 @@
-package server
+package main
 
 import (
 	"database/sql"
 	"os"
+	"parmigiano/http/infra/constants"
 	"parmigiano/http/infra/logger"
 	"parmigiano/http/infra/store/postgres"
 	"parmigiano/http/infra/store/postgres/store"
@@ -27,7 +28,7 @@ func main() {
 	log := logger.NewLogger()
 
 	// connection db
-	db, err := postgres.New(os.Getenv("DB_ADDR"), 75, 13, "7m")
+	db, err := postgres.New(os.Getenv("DB_ADDR"), int(constants.DB_MAX_OPEN_CONNS), int(constants.DB_MAX_IDLE_CONNS), constants.DB_MAX_IDLE_TIME)
 	if err != nil {
 		log.Error(err.Error())
 		return
