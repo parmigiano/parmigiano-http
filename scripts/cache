@@ -1,0 +1,39 @@
+#!/bin/bash
+
+############################################
+
+############################################
+
+set -e
+
+sudo systemctl stop nginx
+sudo rm -f /var/log/nginx/*.log*
+sudo systemctl start nginx
+
+sudo apt clean
+sudo apt autoclean
+sudo apt autoremove
+
+sudo truncate -s 0 /var/log/*.log
+sudo truncate -s 0 /var/log/nginx/*.log
+sudo truncate -s 0 /var/log/syslog
+sudo journalctl --vacuum-time=7d
+sudo journalctl --vacuum-size=100M
+
+sudo rm -rf /var/cache/apt/archives/*
+sudo rm -rf /var/cache/man/*
+
+sudo rm -rf /tmp/*
+sudo rm -rf /var/tmp/*
+
+go clean -cache -testcache
+go clean -cache
+
+rm -rf ~/.cache/go-build
+rm -rf ~/go/pkg/mod
+
+pnpm store prune
+
+sudo truncate -s 0 /var/log/rabbitmq/*.log
+
+sudo -u postgres truncate -s 0 /var/log/postgresql/postgresql-16-main.log

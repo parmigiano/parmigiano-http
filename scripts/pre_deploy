@@ -1,0 +1,71 @@
+#!/bin/bash
+
+############################################
+# Этот bash-скрипт предназначен для подготовки
+# кода к deploy, а именно проверяет размер файлов
+# заменяет локальные данные на внешний IP
+############################################
+
+set -e
+
+# COLORS
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+GO_VERSION="1.24.0"
+
+HOME="$(git rev-parse --show-toplevel)"
+FILE_GO_HTTP="cmd/server/main.go"
+
+if ! command -v go &>/dev/null; then
+    echo -e "${YELLOW}Golang not found. Install...${NC}"
+    if ! command -v wget &> /dev/null; then
+        echo "Installing wget..."
+        sudo apt-get update
+        sudo apt-get install -y wget
+    fi
+
+    echo "Downloading Go ${GO_VERSION} for Linux..."
+    wget https://go.dev/dl/go${GO_VERSION}.linux-amd64.tar.gz
+
+    echo "Removing old Go installation if exists..."
+    sudo rm -rf /usr/local/go
+
+    echo "Installing Go..."
+    sudo tar -C /usr/local -xzf go${GO_VERSION}.linux-amd64.tar.gz
+
+    if [[ ":$PATH:" != *":/usr/local/go/bin:"* ]]; then
+        echo "Adding Go to PATH..."
+        echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+        source ~/.bashrc
+    fi
+
+    rm go${GO_VERSION}.linux-amd64.tar.gz
+    go version
+else
+    echo -e "Golang already install."
+fi
+
+cd "$HOME"
+# Используем sed для замены 'Load()' на 'Load(".env.production")'
+echo -e "${BLUE}Замена Load() на Load(".env.production")${NC}"
+if sed -i.bak 's/godotenv.Load()/godotenv.Load(".env.production")/' "$HOME/$FILE_GO_HTTP"; then
+    echo -e "Значение переменной Load() заменено на Load(".env.production") в $FILE_GO_HTTP"
+else
+    echo -e "Ошибка: Не удалось заменить значение в файле $FILE_GO_HTTP."
+    exit 1
+fi
+
+cd "$HOME"
+make build
+size=$(du -sm "$HOME/bin" | cut -f1)
+if [ "$size" -gt 555 ]; then
+    echo -e "${RED}Ошибка: Размер папки или файла больше 555 МБ: 'SubscriptionPlusServer' (${size} MB)${NC}"
+    exit 1
+elif [ "$size" -gt 200 ]; then
+    echo -e "${YELLOW}Предупреждение: Размер папки или файла больше 200 МБ: 'SubscriptionPlusServer' (${size} MB)${NC}"
+else
+    echo -e "${GREEN}Размер папки или файла в пределах нормы: 'SubscriptionPlusServer' (${size} MB)${NC}"
+fi

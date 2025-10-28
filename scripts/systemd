@@ -1,0 +1,33 @@
+#!/bin/bash
+
+set -e
+
+# COLORS
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+RED='\033[0;31m'
+NC='\033[0m'
+
+HOME="$(git rev-parse --show-toplevel)"
+
+cd "$HOME"
+make build
+
+sudo cp "$HOME/.systemd/server_http.service" /etc/systemd/system/
+sudo cp "$HOME/.systemd/server_http_reserv.service" /etc/systemd/system/
+
+sudo systemctl stop server_http.service
+sudo systemctl stop server_http_reserv.service
+
+sudo systemctl daemon-reload
+
+sudo systemctl start server_http.service
+sudo systemctl start server_http_reserv.service
+
+sudo systemctl status server_http.service
+sudo systemctl status server_http_reserv.service
+
+sudo systemctl enable server_http.service
+sudo systemctl enable server_http_reserv.service
+
+echo -e "${GREEN}Successful creation and launch of systemd services!${NC}"
