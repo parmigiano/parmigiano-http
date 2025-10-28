@@ -1,0 +1,8 @@
+-- REDIS
+-- POSTGRESQL
+-- GOLANG : 1.23.0
+-- GOOSE (for migrate)
+-- GCC Compiler
+-- PROTO
+-- MAKE
+-- CMAKE
