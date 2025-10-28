@@ -72,14 +72,7 @@ jobs:
     deploy_prod:
         name: Deploy production
         runs-on: ubuntu-latest
-        needs:
-            [
-                client_tests,
-                client_build_release,
-                http_server_build,
-                http_server_tests,
-                tcp_server_build,
-            ]
+        needs: [http_server_build, http_server_tests]
         if: github.ref == 'refs/heads/main'
         steps:
             - uses: actions/checkout@v3
