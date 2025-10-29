@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/parmigiano/parmigiano-http/blob/prepare-assets/assets/parmigianochat.png?raw=true" alt="ParmigianoChat Logo" width="150" height="150">
+  <img src="https://github.com/parmigiano/parmigiano-http/blob/prepare-assets/assets/parmigianochat.png?raw=true" alt="ParmigianoChat Logo" width="250" height="250">
 </p>
 
 <p align="center">
