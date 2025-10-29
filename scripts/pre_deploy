@@ -62,10 +62,10 @@ cd "$HOME"
 make build
 size=$(du -sm "$HOME/bin" | cut -f1)
 if [ "$size" -gt 555 ]; then
-    echo -e "${RED}Ошибка: Размер папки или файла больше 555 МБ: 'SubscriptionPlusServer' (${size} MB)${NC}"
+    echo -e "${RED}Ошибка: Размер папки или файла больше 555 МБ: 'ParmigianoChatServer' (${size} MB)${NC}"
     exit 1
 elif [ "$size" -gt 200 ]; then
-    echo -e "${YELLOW}Предупреждение: Размер папки или файла больше 200 МБ: 'SubscriptionPlusServer' (${size} MB)${NC}"
+    echo -e "${YELLOW}Предупреждение: Размер папки или файла больше 200 МБ: 'ParmigianoChatServer' (${size} MB)${NC}"
 else
-    echo -e "${GREEN}Размер папки или файла в пределах нормы: 'SubscriptionPlusServer' (${size} MB)${NC}"
+    echo -e "${GREEN}Размер папки или файла в пределах нормы: 'ParmigianoChatServer' (${size} MB)${NC}"
 fi
