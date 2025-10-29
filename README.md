@@ -27,13 +27,13 @@
 
 ## Пакеты
 
-| Пакеты     | Версии                                                                                         |
-| ---------- | :--------------------------------------------------------------------------------------------- |
-| C++        | [![vite version](https://img.shields.io/npm/v/vite.svg?label=%20)](packages/vite/CHANGELOG.md) |
-| Golang     | v1.24.9                                                                                        |
-| C#         | latest                                                                                         |
-| Make       | v4.4.1                                                                                         |
-| CMake      | v3                                                                                             |
-| Protobuf   | v3                                                                                             |
-| PostgreSql | v16.0.0                                                                                        |
-| GitHub     | undefined                                                                                      |
+| Пакеты     | Версии    |
+| ---------- | :-------- |
+| C++        | v20       |
+| Golang     | v1.24.9   |
+| C#         | latest    |
+| Make       | v4.4.1    |
+| CMake      | v3        |
+| Protobuf   | v3        |
+| PostgreSql | v16.0.0   |
+| GitHub     | undefined |
