@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://github.com/parmigiano/parmigiano-http/blob/prepare-assets/assets/parmigianochat.png?raw=true" alt="ParmigianoChat Logo" width="250" height="250">
+  <img src="https://github.com/parmigiano/parmigiano-http/blob/main/assets/parmigianochat.png?raw=true" alt="ParmigianoChat Logo" width="190" height="190">
 </p>
 
 <p align="center">
@@ -37,3 +37,7 @@
 | Protobuf   | v3        |
 | PostgreSql | v16.0.0   |
 | GitHub     | undefined |
+
+## Установка
+
+Перейдите на страницу релизов: 👉 [releases](https://github.com/parmigiano/parmigiano-desktop/releases), Скачайте последнюю стабильную версию, например: `ParmigianoChatSetup-x86_x64.exe`
