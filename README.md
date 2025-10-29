@@ -1,5 +1,3 @@
-# ParmigianoChat HTTP Server
-
 <p align="center">
   <img src="https://github.com/parmigiano/parmigiano-http/blob/prepare-assets/assets/parmigianochat.png?raw=true" alt="ParmigianoChat Logo" width="120" height="120">
 </p>
@@ -10,9 +8,12 @@
   </a>
 </p>
 
-**Parmigiano HTTP Server** — это высокопроизводительный чат для обмена сообщениями в реальном времени.
-Сервер поддерживает двустороннюю синхронизацию сообщений через **HTTP API**, **TCP-транспорт**,
-и реализует архитектуру, готовую для масштабирования до миллионов подключений.
+### ParmigianoChat HTTP Server
+
+**ParmigianoChat** — это высокопроизводительный чат для обмена сообщениями в реальном времени.
+
+`Сервер поддерживает двустороннюю синхронизацию сообщений через **HTTP API**, **TCP-транспорт**,
+и реализует архитектуру, готовую для масштабирования до миллионов подключений.`
 
 ## Основные возможности
 
