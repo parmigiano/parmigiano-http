@@ -43,11 +43,11 @@ func (h *Handler) AuthLoginUserHandler(w http.ResponseWriter, r *http.Request) e
 	}
 
 	if user == nil {
-		return httperr.Unauthorized("пользователь не был найден")
+		return httperr.NotFound("пользователь не был найден")
 	}
 
 	if user.Password != pass {
-		return httperr.Unauthorized("пользователь не был найден")
+		return httperr.NotFound("пользователь не был найден")
 	}
 
 	httpx.HttpResponse(w, r, http.StatusOK, user.AccessToken)
