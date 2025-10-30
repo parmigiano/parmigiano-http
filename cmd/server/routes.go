@@ -5,6 +5,7 @@ import (
 	"parmigiano/http/handler"
 	"parmigiano/http/handler/auth"
 	"parmigiano/http/handler/meta"
+	"parmigiano/http/handler/users"
 	"parmigiano/http/middleware"
 
 	"github.com/gorilla/mux"
@@ -33,6 +34,8 @@ func (s *httpServer) routes() http.Handler {
 	// routes path
 	// authenticate
 	auth.NewHandler(baseHandler).RegisterRoutes(subrouter)
+	// users
+	users.NewHandler(baseHandler).RegisterRoutes(subrouter)
 	// meta
 	meta.NewHandler(baseHandler).RegisterRoutes(subrouter)
 
