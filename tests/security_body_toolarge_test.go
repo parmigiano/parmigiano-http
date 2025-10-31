@@ -13,7 +13,7 @@ func TestSecurityMiddleware_BodyTooLarge(t *testing.T) {
 		w.WriteHeader(200)
 	}))
 
-	largeBody := bytes.Repeat([]byte("A"), 1024*1024+1)
+	largeBody := bytes.Repeat([]byte("A"), 1024*1024+7)
 	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(largeBody))
 	rec := httptest.NewRecorder()
 

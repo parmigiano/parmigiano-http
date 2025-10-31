@@ -18,6 +18,8 @@ type Storage struct {
 		Get_UserProfileByUid(ctx context.Context, userUid uint64) (*models.UserProfile, error)
 		Get_UserCoreByEmail(ctx context.Context, email string) (*models.UserCore, error)
 
+		Update_UserAvatarByUid(ctx context.Context, userUid uint64, avatar string) error
+
 		Delete_UserByUid(ctx context.Context, userUid uint64) error
 	}
 }

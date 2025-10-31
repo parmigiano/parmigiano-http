@@ -7,7 +7,7 @@ import (
 	"parmigiano/http/infra/logger"
 	"parmigiano/http/infra/store/postgres"
 	"parmigiano/http/infra/store/postgres/store"
-	"parmigiano/http/infra/store/redis"
+	"parmigiano/http/pkg/s3"
 
 	"github.com/joho/godotenv"
 )
@@ -38,7 +38,10 @@ func main() {
 	store := store.NewStorage(db, log)
 
 	// initial redis
-	redis.NewRedisDb()
+	// redis.NewRedisDb()
+
+	// initial s3 storage
+	s3.InitS3()
 
 	server := &httpServer{
 		db:     db,

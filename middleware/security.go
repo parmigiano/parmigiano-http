@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	MaxBodySize        = 1 << 20
+	MaxBodySize        = 5 << 20
 	MaxViolationsPerIP = 3
 	IpBlockDuration    = 7 * time.Minute
 )
@@ -61,6 +61,12 @@ func SecurityMiddleware() mux.MiddlewareFunc { //nolint
 			}
 
 			contentType := r.Header.Get("Content-Type")
+
+			if strings.HasPrefix(contentType, "multipart/form-data") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
 			if strings.HasPrefix(contentType, "application/octet-stream") {
 				next.ServeHTTP(w, r)
 				return

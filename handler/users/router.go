@@ -17,4 +17,7 @@ func (h *Handler) RegisterRoutes(router *mux.Router) {
 
 	// access: все
 	userRouter.Handle("/last-messages", httpx.ErrorHandler(h.GetUsersWithLMessageHandler)).Methods(http.MethodGet)
+
+	// access: все
+	userRouter.Handle("/upload/avatar", httpx.ErrorHandler(h.UserUpdateAvatarHandler)).Methods(http.MethodPost)
 }
