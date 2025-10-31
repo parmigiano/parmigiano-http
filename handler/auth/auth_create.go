@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	"math/rand"
 	"parmigiano/http/infra/encryption"
 
 	"net/http"
@@ -12,7 +13,6 @@ import (
 	"time"
 
 	"github.com/go-playground/validator"
-	"github.com/google/uuid"
 )
 
 // AuthCreateUserHandler инициализация пользователя
@@ -47,7 +47,9 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 		_ = tx.Rollback()
 	}()
 
-	uuid := uuid.NewString()
+	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
+	uid := rnd.Intn(9000000000) + 1000000000
+
 	pass, err := encryption.Encrypt(payload.Password)
 	if err != nil {
 		h.Logger.Error("%v", err)
@@ -55,7 +57,7 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	userCore := &models.UserCore{
-		UserUUID:    uuid,
+		UserUid:     uint64(uid),
 		Email:       payload.Email,
 		Password:    pass,
 		AccessToken: token,
@@ -67,7 +69,7 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	UserProfileModel := &models.UserProfile{
-		UserUUID: uuid,
+		UserUid:  uint64(uid),
 		Avatar:   nil,
 		Username: payload.Username,
 	}

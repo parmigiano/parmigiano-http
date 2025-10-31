@@ -7,11 +7,11 @@ CREATE TABLE IF NOT EXISTS messages (
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE,
     -- Пользователи
-    sender_uuid VARCHAR(255) NOT NULL REFERENCES user_cores(user_uuid) ON DELETE CASCADE, -- Получатель
-    receiver_uuid VARCHAR(255) NOT NULL REFERENCES user_cores(user_uuid) ON DELETE CASCADE, -- Отправитель
+    sender_uid BIGINT NOT NULL REFERENCES user_cores(user_uid) ON DELETE CASCADE, -- Получатель
+    receiver_uid BIGINT NOT NULL REFERENCES user_cores(user_uid) ON DELETE CASCADE, -- Отправитель
     -- Контент
     content TEXT NOT NULL,
-    content_type VARCHAR(32) DEFAULT 'text', -- text, image, video, file, voice, etc.
+    content_type VARCHAR(32) CHECK (content_type IN ('text', 'image', 'video', 'file', 'voice')) DEFAULT 'text',
     attachments JSONB,
     -- Доп. поля
     is_edited BOOLEAN DEFAULT FALSE,

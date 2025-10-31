@@ -57,4 +57,4 @@ migrate-down:
 
 database-drop:
 	@echo "==> Dropping all tables in database..."
-	@psql "$(DB_URL)" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
+	"D:\Program Files\PostgreSQL\17\bin\psql.exe" "$(DB_URL)" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"

@@ -1,4 +1,4 @@
-package auth
+package users
 
 import (
 	"net/http"
@@ -7,15 +7,16 @@ import (
 	"parmigiano/http/types"
 )
 
-func (h *Handler) AuthDeleteHandler(w http.ResponseWriter, r *http.Request) error {
+func (h *Handler) GetUsersWithLMessageHandler(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 	authToken := ctx.Value("identity").(*types.AuthToken)
 
-	if err := h.Store.Users.Delete_UserByUid(ctx, authToken.User.UserUid); err != nil {
+	users, err := h.Store.Users.Get_UsersWithLMessage(ctx, authToken.User.UserUid)
+	if err != nil {
 		h.Logger.Error("%v", err)
 		return httperr.Db(ctx, err)
 	}
 
-	httpx.HttpResponse(w, r, http.StatusOK, "Account has been deleted")
+	httpx.HttpResponseWithETag(w, r, http.StatusOK, users)
 	return nil
 }

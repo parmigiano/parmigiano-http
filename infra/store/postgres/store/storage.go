@@ -12,12 +12,13 @@ type Storage struct {
 		Create_UserCore(tx *sql.Tx, ctx context.Context, user *models.UserCore) error
 		Create_UserProfile(tx *sql.Tx, ctx context.Context, user *models.UserProfile) error
 
+		Get_UsersWithLMessage(ctx context.Context, userUid uint64) (*[]models.UserMinimalWithLMessage, error)
 		Get_UserInfoByAccessToken(ctx context.Context, token string) (*models.UserInfo, error)
-		Get_UserCoreByUuid(ctx context.Context, uuid string) (*models.UserCore, error)
-		Get_UserProfileByUuid(ctx context.Context, uuid string) (*models.UserProfile, error)
+		Get_UserCoreByUid(ctx context.Context, userUid uint64) (*models.UserCore, error)
+		Get_UserProfileByUid(ctx context.Context, userUid uint64) (*models.UserProfile, error)
 		Get_UserCoreByEmail(ctx context.Context, email string) (*models.UserCore, error)
 
-		Delete_UserByUuid(ctx context.Context, uuid string) error
+		Delete_UserByUid(ctx context.Context, userUid uint64) error
 	}
 }
 

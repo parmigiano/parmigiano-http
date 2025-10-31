@@ -6,7 +6,7 @@ import (
 	"parmigiano/http/types"
 )
 
-func (h *Handler) GetUserMe(w http.ResponseWriter, r *http.Request) error {
+func (h *Handler) GetUserMeHandler(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 	authToken := ctx.Value("identity").(*types.AuthToken)
 

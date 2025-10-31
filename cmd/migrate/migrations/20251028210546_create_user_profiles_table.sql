@@ -4,7 +4,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     id SERIAL PRIMARY KEY,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    user_uuid VARCHAR(255) NOT NULL UNIQUE REFERENCES user_cores(user_uuid) ON DELETE CASCADE,
+    user_uid BIGINT NOT NULL UNIQUE REFERENCES user_cores(user_uid) ON DELETE CASCADE,
     avatar VARCHAR(255),
     username VARCHAR(30) NOT NULL UNIQUE
 );
