@@ -103,6 +103,8 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
+		fmt.Println(user)
+
 		hub := wsocket.GetHub()
 		hub.Broadcast(map[string]any{
 			"event": constants.EVENT_USER_NEW_REGISTER,

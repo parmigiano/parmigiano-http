@@ -36,12 +36,7 @@ func (h *Hub) Broadcast(message interface{}) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	fmt.Printf("[WS] Broadcast to %d clients: %v\n", len(h.clients), message)
-
 	for c := range h.clients {
-		addr := c.Conn.RemoteAddr().String()
-		fmt.Printf("[WS] Отправляю сообщение клиенту: %s\n", addr)
-
 		err := c.Conn.WriteJSON(message)
 		if err != nil {
 			c.Conn.Close()
