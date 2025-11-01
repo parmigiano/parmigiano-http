@@ -195,6 +195,10 @@ func (l *Logger) Ip(format string, args ...any) {
 
 	logMessage := log.String()
 
-	println(logMessage)
+	// if this develops version
+	if l.dev {
+		println(logMessage)
+	}
+
 	l.logFile("IPs.log", logMessage)
 }

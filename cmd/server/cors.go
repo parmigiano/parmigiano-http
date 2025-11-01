@@ -12,7 +12,7 @@ func (s *httpServer) cors(handler http.Handler) http.Handler {
 
 	var origins []string
 	if env == "DEV" {
-		origins = []string{"http://localhost:5173"}
+		origins = []string{"http://localhost:8080"}
 	} else {
 		origins = []string{}
 	}
