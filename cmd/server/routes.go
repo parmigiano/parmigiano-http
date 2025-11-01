@@ -6,6 +6,7 @@ import (
 	"parmigiano/http/handler/auth"
 	"parmigiano/http/handler/meta"
 	"parmigiano/http/handler/users"
+	"parmigiano/http/handler/wsocket"
 	"parmigiano/http/middleware"
 
 	"github.com/gorilla/mux"
@@ -14,16 +15,16 @@ import (
 func (s *httpServer) routes() http.Handler {
 	router := mux.NewRouter()
 
-	// middleware for logging API request
-	router.Use(middleware.NewLogger(s.logger).LoggerMiddleware)
-	// middleware for get exception errors
-	router.Use(middleware.RecoveryMiddleware())
-	// middleware for security API
-	router.Use(middleware.SecurityMiddleware())
-	// middleware rate limiter
-	router.Use(middleware.RateLimiterMiddleware(10, 20))
+	apirouter := router.PathPrefix("/api/v1").Subrouter()
 
-	subrouter := router.PathPrefix("/api/v1").Subrouter()
+	// middleware for logging API request
+	apirouter.Use(middleware.NewLogger(s.logger).LoggerMiddleware)
+	// middleware for get exception errors
+	apirouter.Use(middleware.RecoveryMiddleware())
+	// middleware for security API
+	apirouter.Use(middleware.SecurityMiddleware())
+	// middleware rate limiter
+	apirouter.Use(middleware.RateLimiterMiddleware(10, 20))
 
 	baseHandler := &handler.BaseHandler{
 		Db:     s.db,
@@ -33,11 +34,16 @@ func (s *httpServer) routes() http.Handler {
 
 	// routes path
 	// authenticate
-	auth.NewHandler(baseHandler).RegisterRoutes(subrouter)
+	auth.NewHandler(baseHandler).RegisterRoutes(apirouter)
 	// users
-	users.NewHandler(baseHandler).RegisterRoutes(subrouter)
+	users.NewHandler(baseHandler).RegisterRoutes(apirouter)
 	// meta
-	meta.NewHandler(baseHandler).RegisterRoutes(subrouter)
+	meta.NewHandler(baseHandler).RegisterRoutes(apirouter)
 
-	return s.cors(router)
+	router.PathPrefix("/api/").Handler(s.cors(apirouter))
+
+	// websocket connection client (pkg. wsocket)
+	router.HandleFunc("/wsocket", wsocket.HandleWebSocket)
+
+	return router
 }

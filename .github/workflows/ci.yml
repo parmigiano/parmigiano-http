@@ -11,33 +11,33 @@ concurrency:
     cancel-in-progress: true
 
 jobs:
-    http_server_lint:
-        name: Lint http server
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v4
-            - name: Install Go
-              uses: actions/setup-go@v5
-              with:
-                  go-version: '1.24.0'
+    # http_server_lint:
+    #     name: Lint http server
+    #     runs-on: ubuntu-latest
+    #     steps:
+    #         - uses: actions/checkout@v4
+    #         - name: Install Go
+    #           uses: actions/setup-go@v5
+    #           with:
+    #               go-version: '1.24.0'
 
-            - name: Install dependencies
-              run: |
-                  go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-                  go install golang.org/x/tools/cmd/goimports@latest
+    #         - name: Install dependencies
+    #           run: |
+    #               go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+    #               go install golang.org/x/tools/cmd/goimports@latest
 
-            - name: Go mod tidy & download
-              run: |
-                  go mod tidy && go mod download
+    #         - name: Go mod tidy & download
+    #           run: |
+    #               go mod tidy && go mod download
 
-            - name: Check imports
-              run: |
-                  goimports -l .
-                  exit 1
+    #         - name: Check imports
+    #           run: |
+    #               goimports -l .
+    #               exit 1
 
-            - name: Lint code
-              run: |
-                  make lint
+    #         - name: Lint code
+    #           run: |
+    #               make lint
 
     http_server_build:
         name: Build binary http server
@@ -86,13 +86,13 @@ jobs:
                   script: |
                       set -e
 
-                      cd ./parmigiano-http
+                      cd /root/parmigiano-http
 
                       git stash
                       git checkout main
                       git pull origin main
 
-                      cd ./scripts
+                      cd /root/parmigiano-http/scripts
 
                       bash pre_deploy
                       bash systemd

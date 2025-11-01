@@ -3,6 +3,8 @@ package auth
 import (
 	"fmt"
 	"math/rand"
+	"parmigiano/http/handler/wsocket"
+	"parmigiano/http/infra/constants"
 	"parmigiano/http/infra/encryption"
 
 	"net/http"
@@ -79,10 +81,34 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 		return httperr.Db(ctx, err)
 	}
 
+	UserActiveModel := &models.UserActive{
+		UserUid: uint64(uid),
+	}
+
+	if err := h.Store.Users.Create_UserActive(tx, ctx, UserActiveModel); err != nil {
+		h.Logger.Error("%v", err)
+		return httperr.Db(ctx, err)
+	}
+
 	if err := tx.Commit(); err != nil {
 		h.Logger.Error("%v", err)
 		return httperr.Conflict("failed to save data, please try again later")
 	}
+
+	// send event 'register_new_user' for all users
+	go func(userUid uint64) {
+		user, err := h.Store.Users.Get_UserWithLMessage(ctx, userUid)
+		if err != nil {
+			h.Logger.Error("%v", err)
+			return
+		}
+
+		hub := wsocket.GetHub()
+		hub.Broadcast(map[string]any{
+			"event": constants.EVENT_USER_NEW_REGISTER,
+			"data":  user,
+		})
+	}(uint64(uid))
 
 	httpx.HttpResponse(w, r, http.StatusCreated, token)
 	return nil

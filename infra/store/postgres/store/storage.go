@@ -11,8 +11,10 @@ type Storage struct {
 	Users interface { //nolint
 		Create_UserCore(tx *sql.Tx, ctx context.Context, user *models.UserCore) error
 		Create_UserProfile(tx *sql.Tx, ctx context.Context, user *models.UserProfile) error
+		Create_UserActive(tx *sql.Tx, ctx context.Context, user *models.UserActive) error
 
 		Get_UsersWithLMessage(ctx context.Context, userUid uint64) (*[]models.UserMinimalWithLMessage, error)
+		Get_UserWithLMessage(ctx context.Context, userUid uint64) (*models.UserMinimalWithLMessage, error)
 		Get_UserInfoByAccessToken(ctx context.Context, token string) (*models.UserInfo, error)
 		Get_UserCoreByUid(ctx context.Context, userUid uint64) (*models.UserCore, error)
 		Get_UserProfileByUid(ctx context.Context, userUid uint64) (*models.UserProfile, error)

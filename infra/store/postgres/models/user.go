@@ -11,6 +11,14 @@ type UserProfile struct {
 	Username  string    `json:"username" db:"username"`
 }
 
+type UserActive struct {
+	ID        uint64    `json:"id" db:"id"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+	UserUid   uint64    `json:"user_uid" db:"user_uid"`
+	Online    bool      `json:"online" db:"online"`
+}
+
 type UserCore struct {
 	ID           uint64    `json:"id" db:"id"`
 	CreatedAt    time.Time `json:"created_at" db:"created_at"`
@@ -36,12 +44,15 @@ type UserInfo struct {
 }
 
 type UserMinimalWithLMessage struct {
-	ID              uint64     `json:"id" db:"id"`
-	Username        string     `json:"username" db:"username"`
-	Avatar          *string    `json:"avatar" db:"avatar"`
-	UserUid         uint64     `json:"user_uid" db:"user_uid"`
-	LastMessage     *string    `json:"last_message" db:"last_message"`
-	LastMessageDate *time.Time `json:"last_message_date" db:"last_message_date"`
+	ID                 uint64     `json:"id" db:"id"`
+	Username           string     `json:"username" db:"username"`
+	Avatar             *string    `json:"avatar" db:"avatar"`
+	UserUid            uint64     `json:"user_uid" db:"user_uid"`
+	Online             bool       `json:"online" db:"online"`
+	LastOnlineDate     time.Time  `json:"last_online_date" db:"last_online_date"`
+	LastMessage        *string    `json:"last_message" db:"last_message"`
+	LastMessageDate    *time.Time `json:"last_message_date" db:"last_message_date"`
+	UnreadMessageCount uint16     `json:"unread_message_count" db:"unread_message_count"`
 }
 
 type UserMinimal struct {

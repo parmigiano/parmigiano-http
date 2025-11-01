@@ -4,6 +4,8 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"parmigiano/http/handler/wsocket"
+	"parmigiano/http/infra/constants"
 	"parmigiano/http/pkg/httpx"
 	"parmigiano/http/pkg/httpx/httperr"
 	"parmigiano/http/pkg/s3"
@@ -27,8 +29,11 @@ func (h *Handler) UserUpdateAvatarHandler(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		return httperr.InternalServerError("ошибка создания временного файла")
 	}
-	defer tempFile.Close()
-	defer os.Remove(tempPath)
+
+	defer func() {
+		tempFile.Close()
+		os.Remove(tempPath)
+	}()
 
 	_, err = io.Copy(tempFile, file)
 	if err != nil {
@@ -46,11 +51,25 @@ func (h *Handler) UserUpdateAvatarHandler(w http.ResponseWriter, r *http.Request
 		return httperr.Db(ctx, err)
 	}
 
-	if authToken.User.Avatar != nil || *authToken.User.Avatar != "" {
-		if err := s3.DeleteFile(*authToken.User.Avatar); err != nil {
-			h.Logger.Warning("Failed to delete avatar: %v", err)
+	go func(avatar *string) {
+		if avatar != nil {
+			if err := s3.DeleteFile(*avatar); err != nil {
+				h.Logger.Warning("Failed to delete avatar: %v", err)
+			}
 		}
-	}
+	}(authToken.User.Avatar)
+
+	// send event 'user_avatar_updated' for all users
+	go func(userUid uint64, avatarUrl string) {
+		hub := wsocket.GetHub()
+		hub.Broadcast(map[string]any{
+			"event": constants.EVENT_USER_AVATAR_UPDATED,
+			"data": map[string]any{
+				"user_uid": userUid,
+				"url":      avatarUrl,
+			},
+		})
+	}(authToken.User.UserUid, url)
 
 	httpx.HttpResponse(w, r, http.StatusOK, url)
 	return nil
