@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"parmigiano/http/handler/wsocket"
@@ -97,7 +98,7 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 
 	// send event 'register_new_user' for all users
 	go func(userUid uint64) {
-		user, err := h.Store.Users.Get_UserWithLMessage(ctx, userUid)
+		user, err := h.Store.Users.Get_UserWithLMessage(context.Background(), userUid)
 		if err != nil {
 			h.Logger.Error("%v", err)
 			return
@@ -110,7 +111,7 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 			"event": constants.EVENT_USER_NEW_REGISTER,
 			"data":  user,
 		})
-	}(uint64(uid))
+	}(UserActiveModel.UserUid)
 
 	httpx.HttpResponse(w, r, http.StatusCreated, token)
 	return nil
