@@ -7,6 +7,7 @@ import (
 	"parmigiano/http/handler/wsocket"
 	"parmigiano/http/infra/constants"
 	"parmigiano/http/infra/encryption"
+	"parmigiano/http/pkg"
 
 	"net/http"
 	"parmigiano/http/infra/store/postgres/models"
@@ -59,14 +60,14 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 		return httperr.InternalServerError(err.Error())
 	}
 
-	userCore := &models.UserCore{
+	UserCore := &models.UserCore{
 		UserUid:     uint64(uid),
 		Email:       payload.Email,
 		Password:    pass,
 		AccessToken: token,
 	}
 
-	if errUserCore := h.Store.Users.Create_UserCore(tx, ctx, userCore); errUserCore != nil {
+	if errUserCore := h.Store.Users.Create_UserCore(tx, ctx, UserCore); errUserCore != nil {
 		h.Logger.Error("%v", errUserCore)
 		return httperr.Db(ctx, errUserCore)
 	}
@@ -95,6 +96,31 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 		h.Logger.Error("%v", err)
 		return httperr.Conflict("failed to save data, please try again later")
 	}
+
+	// send link to email for confirm
+	// ------------------------------
+	link := util.GenerateVerificationEmailLink(UserActiveModel.UserUid)
+
+	go func() {
+		if errSendEmail := pkg.SendEmail(UserCore.Email, "Подтверждения адреса электронной почты ParmigianoChat", fmt.Sprintf(`
+			<body>
+				<p>Мы получили запрос на использование адреса электронной почты <b>%s</b></p>
+				<p>Чтобы завершить настройку, перейдите по ссылке для подтверждения электронной почты:</p>
+
+				<a href="%s">
+					%s
+				</a>
+
+				<p>Срок действия ссылки истечет через 30 минут...</p>
+			</body>
+		`, UserCore.Email, link, link)); errSendEmail != nil {
+			h.Logger.Error("%v", errSendEmail)
+		}
+
+		h.Logger.Info("Reset link for %s: %s", UserCore.Email, link)
+	}()
+	// ------------------------------
+	// send link to email for confirm
 
 	// send event 'register_new_user' for all users
 	go func(userUid uint64) {

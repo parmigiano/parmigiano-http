@@ -220,7 +220,7 @@ func (s *UserStore) Get_UserInfoByAccessToken(ctx context.Context, token string)
 			user_profiles.avatar,
 			user_profiles.username,
 			user_cores.email,
-			user_cores.password,
+			user_cores.email_confirmed,
 			user_cores.access_token,
 			user_cores.refresh_token
 		FROM user_cores
@@ -242,7 +242,7 @@ func (s *UserStore) Get_UserInfoByAccessToken(ctx context.Context, token string)
 		&user.Avatar,
 		&user.Username,
 		&user.Email,
-		&user.Password,
+		&user.EmailConfirmed,
 		&user.AccessToken,
 		&user.RefreshToken,
 	); err != nil {
@@ -264,6 +264,7 @@ func (s *UserStore) Get_UserCoreByUid(ctx context.Context, userUid uint64) (*mod
 		    id,
 		    user_uid,
 		    email,
+			email_confirmed,
 			password,
 		    access_token,
 		    refresh_token
@@ -277,7 +278,15 @@ func (s *UserStore) Get_UserCoreByUid(ctx context.Context, userUid uint64) (*mod
 
 	row := s.db.QueryRowContext(ctx, query, userUid)
 
-	if err := row.Scan(&user.ID, &user.UserUid, &user.Email, &user.Password, &user.AccessToken, &user.RefreshToken); err != nil {
+	if err := row.Scan(
+		&user.ID,
+		&user.UserUid,
+		&user.Email,
+		&user.EmailConfirmed,
+		&user.Password,
+		&user.AccessToken,
+		&user.RefreshToken,
+	); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
@@ -326,6 +335,7 @@ func (s *UserStore) Get_UserCoreByEmail(ctx context.Context, email string) (*mod
 		    id,
 		    user_uid,
 		    email,
+			email_confirmed,
 			password,
 		    access_token,
 		    refresh_token
@@ -339,7 +349,15 @@ func (s *UserStore) Get_UserCoreByEmail(ctx context.Context, email string) (*mod
 
 	row := s.db.QueryRowContext(ctx, query, email)
 
-	if err := row.Scan(&user.ID, &user.UserUid, &user.Email, &user.Password, &user.AccessToken, &user.RefreshToken); err != nil {
+	if err := row.Scan(
+		&user.ID,
+		&user.UserUid,
+		&user.Email,
+		&user.EmailConfirmed,
+		&user.Password,
+		&user.AccessToken,
+		&user.RefreshToken,
+	); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
@@ -348,6 +366,22 @@ func (s *UserStore) Get_UserCoreByEmail(ctx context.Context, email string) (*mod
 	}
 
 	return &user, nil
+}
+
+func (s *UserStore) Update_UserEmailConfirmedByUid(ctx context.Context, userUid uint64, confirmed bool) error {
+	query := `
+		UPDATE user_cores SET email_confirmed = $1 WHERE user_uid = $2
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx, query, confirmed, userUid)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (s *UserStore) Update_UserAvatarByUid(ctx context.Context, userUid uint64, avatar string) error {

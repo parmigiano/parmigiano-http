@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS user_cores (
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     user_uid BIGINT NOT NULL UNIQUE,
     email VARCHAR(100) NOT NULL UNIQUE,
+    email_confirmed BOOLEAN DEFAULT FALSE,
     password VARCHAR(255) NOT NULL,
     access_token VARCHAR(255) NOT NULL UNIQUE,
     refresh_token VARCHAR(255) UNIQUE

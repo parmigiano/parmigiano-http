@@ -20,27 +20,28 @@ type UserActive struct {
 }
 
 type UserCore struct {
-	ID           uint64    `json:"id" db:"id"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
-	UserUid      uint64    `json:"user_uid" db:"user_uid"`
-	Email        string    `json:"email" db:"email"`
-	Password     string    `json:"password" db:"password"`
-	AccessToken  string    `json:"access_token" db:"access_token"`
-	RefreshToken *string   `json:"refresh_token" db:"refresh_token"`
+	ID             uint64    `json:"id" db:"id"`
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
+	UserUid        uint64    `json:"user_uid" db:"user_uid"`
+	Email          string    `json:"email" db:"email"`
+	EmailConfirmed bool      `json:"email_confirmed" db:"email_confirmed"`
+	Password       string    `json:"password" db:"password"`
+	AccessToken    string    `json:"access_token" db:"access_token"`
+	RefreshToken   *string   `json:"refresh_token" db:"refresh_token"`
 }
 
 type UserInfo struct {
-	ID           uint64    `json:"id" db:"id"`
-	CreatedAt    time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at" db:"updated_at"`
-	UserUid      uint64    `json:"user_uid" db:"user_uid"`
-	Avatar       *string   `json:"avatar" db:"avatar"`
-	Username     string    `json:"username" db:"username"`
-	Email        string    `json:"email" db:"email"`
-	Password     string    `json:"password" db:"password"`
-	AccessToken  string    `json:"access_token" db:"access_token"`
-	RefreshToken *string   `json:"refresh_token" db:"refresh_token"`
+	ID             uint64    `json:"id" db:"id"`
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
+	UserUid        uint64    `json:"user_uid" db:"user_uid"`
+	Avatar         *string   `json:"avatar" db:"avatar"`
+	Username       string    `json:"username" db:"username"`
+	Email          string    `json:"email" db:"email"`
+	EmailConfirmed bool      `json:"email_confirmed" db:"email_confirmed"`
+	AccessToken    string    `json:"access_token" db:"access_token"`
+	RefreshToken   *string   `json:"refresh_token" db:"refresh_token"`
 }
 
 type UserMinimalWithLMessage struct {
@@ -56,11 +57,12 @@ type UserMinimalWithLMessage struct {
 }
 
 type UserMinimal struct {
-	ID        uint64    `json:"id" db:"id"`
-	CreatedAt time.Time `json:"created_at" db:"created_at"`
-	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
-	UserUid   uint64    `json:"user_uid" db:"user_uid"`
-	Avatar    *string   `json:"avatar" db:"avatar"`
-	Username  string    `json:"username" db:"username"`
-	Email     string    `json:"email" db:"email"`
+	ID             uint64    `json:"id" db:"id"`
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
+	UserUid        uint64    `json:"user_uid" db:"user_uid"`
+	Avatar         *string   `json:"avatar" db:"avatar"`
+	Username       string    `json:"username" db:"username"`
+	Email          string    `json:"email" db:"email"`
+	EmailConfirmed bool      `json:"email_confirmed" db:"email_confirmed"`
 }
