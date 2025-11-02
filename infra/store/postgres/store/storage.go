@@ -24,11 +24,15 @@ type Storage struct {
 
 		Delete_UserByUid(ctx context.Context, userUid uint64) error
 	}
+	Messages interface { //nolint
+		Get_MessagesHistoryByReceiver(ctx context.Context, receiverUid, senderUid uint64) (*[]models.OnesMessage, error)
+	}
 }
 
 func NewStorage(db *sql.DB, logger *logger.Logger) Storage {
 	return Storage{
-		Users: &UserStore{db, logger},
+		Users:    &UserStore{db, logger},
+		Messages: &MessageStore{db, logger},
 	}
 }
 
