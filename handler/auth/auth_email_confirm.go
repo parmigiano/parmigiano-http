@@ -3,6 +3,8 @@ package auth
 import (
 	"fmt"
 	"net/http"
+	"parmigiano/http/handler/wsocket"
+	"parmigiano/http/infra/constants"
 	"parmigiano/http/pkg"
 	"parmigiano/http/pkg/httpx"
 	"parmigiano/http/types"
@@ -117,6 +119,17 @@ func (h *Handler) AuthEmailConfirmHandler(w http.ResponseWriter, r *http.Request
 		renderError("Временная ошибка сервера. Повторите попытку через несколько минут.")
 		return nil
 	}
+
+	// send event 'auth_email_confirmed' for user
+	go func(userUid uint64) {
+		hub := wsocket.GetHub()
+		hub.Broadcast(map[string]any{
+			"event": constants.EVENT_AUTH_EMAIL_CONFIRMED,
+			"data": map[string]any{
+				"user_uid": userUid,
+			},
+		})
+	}(uint64(userUid))
 
 	html := renderHtml("Ваша почта успешно подтверждена!", "Теперь вы можете войти в приложение ParmigianoChat и начать общение с другими пользователями. Благодарим вас за регистрацию и доверие к нашему сервису.")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

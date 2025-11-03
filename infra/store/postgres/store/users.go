@@ -58,13 +58,13 @@ func (s *UserStore) Create_UserProfile(tx *sql.Tx, ctx context.Context, user *mo
 
 func (s *UserStore) Create_UserActive(tx *sql.Tx, ctx context.Context, user *models.UserActive) error {
 	query := `
-		INSERT INTO user_actives (user_uid) VALUES ($1)
+		INSERT INTO user_actives (user_uid, online) VALUES ($1, $2)
 	`
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	_, err := tx.ExecContext(ctx, query, user.UserUid)
+	_, err := tx.ExecContext(ctx, query, user.UserUid, false)
 	if err != nil {
 		return err
 	}
@@ -81,6 +81,7 @@ func (s *UserStore) Get_UsersWithLMessage(ctx context.Context, userUid uint64) (
 			user_profiles.username,
 			user_profiles.avatar,
 			user_cores.user_uid,
+			user_cores.email,
 			user_actives.online,
 			user_actives.updated_at as last_online_date,
 			last_message.content AS last_message,
@@ -133,6 +134,7 @@ func (s *UserStore) Get_UsersWithLMessage(ctx context.Context, userUid uint64) (
 			&user.Username,
 			&user.Avatar,
 			&user.UserUid,
+			&user.Email,
 			&user.Online,
 			&user.LastOnlineDate,
 			&user.LastMessage,
@@ -163,6 +165,7 @@ func (s *UserStore) Get_UserWithLMessage(ctx context.Context, userUid uint64) (*
 			user_profiles.username,
 			user_profiles.avatar,
 			user_cores.user_uid,
+			user_cores.email,
 			user_actives.online,
 			user_actives.updated_at as last_online_date,
 			last_message.content AS last_message,
@@ -194,6 +197,7 @@ func (s *UserStore) Get_UserWithLMessage(ctx context.Context, userUid uint64) (*
 		&user.Username,
 		&user.Avatar,
 		&user.UserUid,
+		&user.Email,
 		&user.Online,
 		&user.LastOnlineDate,
 		&user.LastMessage,
@@ -369,15 +373,32 @@ func (s *UserStore) Get_UserCoreByEmail(ctx context.Context, email string) (*mod
 }
 
 func (s *UserStore) Update_UserEmailConfirmedByUid(ctx context.Context, userUid uint64, confirmed bool) error {
-	query := `
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	queryUserCore := `
 		UPDATE user_cores SET email_confirmed = $1 WHERE user_uid = $2
+	`
+
+	queryUserActive := `
+		UPDATE user_actives SET online = true WHERE user_uid = $1
 	`
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	_, err := s.db.ExecContext(ctx, query, confirmed, userUid)
-	if err != nil {
+	if _, err := tx.ExecContext(ctx, queryUserCore, confirmed, userUid); err != nil {
+		return err
+	}
+
+	if _, err := tx.ExecContext(ctx, queryUserActive, userUid); err != nil {
+		return err
+	}
+
+	if err := tx.Commit(); err != nil {
 		return err
 	}
 

@@ -49,6 +49,7 @@ type UserMinimalWithLMessage struct {
 	Username           string     `json:"username" db:"username"`
 	Avatar             *string    `json:"avatar" db:"avatar"`
 	UserUid            uint64     `json:"user_uid" db:"user_uid"`
+	Email              string     `json:"email" db:"email"`
 	Online             bool       `json:"online" db:"online"`
 	LastOnlineDate     time.Time  `json:"last_online_date" db:"last_online_date"`
 	LastMessage        *string    `json:"last_message" db:"last_message"`

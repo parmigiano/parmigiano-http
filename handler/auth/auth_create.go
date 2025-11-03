@@ -8,6 +8,7 @@ import (
 	"parmigiano/http/infra/constants"
 	"parmigiano/http/infra/encryption"
 	"parmigiano/http/pkg"
+	"strings"
 
 	"net/http"
 	"parmigiano/http/infra/store/postgres/models"
@@ -59,6 +60,8 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 		h.Logger.Error("%v", err)
 		return httperr.InternalServerError(err.Error())
 	}
+
+	payload.Email = strings.ToLower(strings.ReplaceAll(strings.TrimSpace(payload.Email), " ", ""))
 
 	UserCore := &models.UserCore{
 		UserUid:     uint64(uid),

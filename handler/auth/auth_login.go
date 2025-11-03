@@ -2,6 +2,7 @@ package auth
 
 import (
 	"parmigiano/http/infra/encryption"
+	"strings"
 
 	"net/http"
 	"parmigiano/http/pkg/httpx"
@@ -29,6 +30,8 @@ func (h *Handler) AuthLoginUserHandler(w http.ResponseWriter, r *http.Request) e
 
 		return httperr.BadRequest("не все поля заполнены")
 	}
+
+	payload.Email = strings.ToLower(strings.ReplaceAll(strings.TrimSpace(payload.Email), " ", ""))
 
 	pass, err := encryption.Encrypt(payload.Password)
 	if err != nil {
