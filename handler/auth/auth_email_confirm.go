@@ -7,9 +7,12 @@ import (
 	"parmigiano/http/infra/constants"
 	"parmigiano/http/pkg"
 	"parmigiano/http/pkg/httpx"
+	"parmigiano/http/pkg/httpx/httperr"
 	"parmigiano/http/types"
 	"parmigiano/http/util"
 	"strconv"
+
+	"github.com/go-playground/validator"
 )
 
 func renderHtml(title, message string) string {
@@ -143,12 +146,33 @@ func (h *Handler) AuthEmailConfirmReqHandler(w http.ResponseWriter, r *http.Requ
 	ctx := r.Context()
 	authToken := ctx.Value("identity").(*types.AuthToken)
 
+	var payload *ReqEmailConfirmPayload
+
+	if err := httpx.HttpParse(r, &payload); err != nil {
+		h.Logger.Error("%v", err)
+		return httperr.BadRequest(err.Error())
+	}
+
+	if err := httpx.Validate.Struct(payload); err != nil {
+		h.Logger.Error("%v", err)
+		if _, ok := err.(validator.ValidationErrors); ok {
+			return httperr.BadRequest(httpx.ValidateMsg(err))
+		}
+
+		return httperr.BadRequest("не все поля заполнены")
+	}
+
 	// send link to email for confirm
 	// ------------------------------
 	link := util.GenerateVerificationEmailLink(authToken.User.UserUid)
 
+	if err := h.Store.Users.Update_UserEmailByUid(ctx, authToken.User.UserUid, payload.Email); err != nil {
+		h.Logger.Error("%v", err)
+		return httperr.Db(ctx, err)
+	}
+
 	go func() {
-		if errSendEmail := pkg.SendEmail(authToken.User.Email, "Подтверждения адреса электронной почты ParmigianoChat", fmt.Sprintf(`
+		if errSendEmail := pkg.SendEmail(payload.Email, "Подтверждения адреса электронной почты ParmigianoChat", fmt.Sprintf(`
 			<body>
 				<p>Мы получили запрос на использование адреса электронной почты <b>%s</b></p>
 				<p>Чтобы завершить настройку, перейдите по ссылке для подтверждения электронной почты:</p>
@@ -159,11 +183,11 @@ func (h *Handler) AuthEmailConfirmReqHandler(w http.ResponseWriter, r *http.Requ
 
 				<p>Срок действия ссылки истечет через 30 минут...</p>
 			</body>
-		`, authToken.User.Email, link, link)); errSendEmail != nil {
+		`, payload.Email, link, link)); errSendEmail != nil {
 			h.Logger.Error("%v", errSendEmail)
 		}
 
-		h.Logger.Info("Reset link for %s: %s", authToken.User.Email, link)
+		h.Logger.Info("Reset link for %s: %s", payload.Email, link)
 	}()
 	// ------------------------------
 	// send link to email for confirm

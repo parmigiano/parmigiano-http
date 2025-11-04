@@ -26,7 +26,7 @@ func (s *MessageStore) Get_MessagesHistoryByReceiver(ctx context.Context, receiv
 			messages.content_type,
 			messages.is_edited,
 			messages.is_pinned,
-			COALESCE(message_statuses.delivered_at, message_statuses.created_at) AS delivered_at,
+			COALESCE(message_statuses.delivered_at, messages.created_at) AS delivered_at,
 			message_statuses.read_at,
 			message_edits.new_content AS edit_content
 		FROM messages

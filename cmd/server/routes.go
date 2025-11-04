@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"parmigiano/http/handler"
 	"parmigiano/http/handler/auth"
+	"parmigiano/http/handler/messages"
 	"parmigiano/http/handler/meta"
 	"parmigiano/http/handler/users"
 	"parmigiano/http/handler/wsocket"
@@ -37,6 +38,8 @@ func (s *httpServer) routes() http.Handler {
 	auth.NewHandler(baseHandler).RegisterRoutes(apirouter)
 	// users
 	users.NewHandler(baseHandler).RegisterRoutes(apirouter)
+	// messages
+	messages.NewHandler(baseHandler).RegisterRoutes(apirouter)
 	// meta
 	meta.NewHandler(baseHandler).RegisterRoutes(apirouter)
 

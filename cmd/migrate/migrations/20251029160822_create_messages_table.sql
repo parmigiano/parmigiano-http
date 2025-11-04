@@ -3,9 +3,9 @@
 CREATE TABLE IF NOT EXISTS messages (
     id SERIAL PRIMARY KEY,
     -- Временные метки
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    deleted_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT (timezone('UTC', now())),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT (timezone('UTC', now())),
+    deleted_at TIMESTAMPTZ,
     -- Пользователи
     sender_uid BIGINT NOT NULL REFERENCES user_cores(user_uid) ON DELETE CASCADE, -- Получатель
     receiver_uid BIGINT NOT NULL REFERENCES user_cores(user_uid) ON DELETE CASCADE, -- Отправитель

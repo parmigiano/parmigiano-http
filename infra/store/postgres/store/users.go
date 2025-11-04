@@ -405,6 +405,22 @@ func (s *UserStore) Update_UserEmailConfirmedByUid(ctx context.Context, userUid 
 	return nil
 }
 
+func (s *UserStore) Update_UserEmailByUid(ctx context.Context, userUid uint64, email string) error {
+	query := `
+		UPDATE user_cores SET email = $1 WHERE user_uid = $2
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx, query, email, userUid)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s *UserStore) Update_UserAvatarByUid(ctx context.Context, userUid uint64, avatar string) error {
 	query := `
 		UPDATE user_profiles SET avatar = $1 WHERE user_uid = $2

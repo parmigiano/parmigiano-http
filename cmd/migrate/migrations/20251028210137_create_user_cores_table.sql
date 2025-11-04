@@ -2,8 +2,8 @@
 -- +goose StatementBegin
 CREATE TABLE IF NOT EXISTS user_cores (
     id SERIAL PRIMARY KEY,
-    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT (timezone('UTC', now())),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT (timezone('UTC', now())),
     user_uid BIGINT NOT NULL UNIQUE,
     email VARCHAR(100) NOT NULL UNIQUE,
     email_confirmed BOOLEAN DEFAULT FALSE,

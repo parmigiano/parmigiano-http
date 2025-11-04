@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS message_edits (
     old_content TEXT,
     new_content TEXT,
     editor_uid BIGINT REFERENCES user_cores(user_uid) ON DELETE SET NULL,
-    edited_at TIMESTAMP NOT NULL DEFAULT NOW()
+    edited_at TIMESTAMPTZ NOT NULL DEFAULT (timezone('UTC', now()))
 );
 -- +goose StatementEnd
 

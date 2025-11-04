@@ -24,7 +24,7 @@ func (h *Handler) RegisterRoutes(router *mux.Router) {
 	authRouter.Handle("/confirm", httpx.ErrorHandler(h.AuthEmailConfirmHandler)).Methods(http.MethodGet)
 
 	// access: все
-	authProtectedRouter.Handle("/confirm/req", httpx.ErrorHandler(h.AuthEmailConfirmReqHandler)).Methods(http.MethodGet)
+	authProtectedRouter.Handle("/confirm/req", httpx.ErrorHandler(h.AuthEmailConfirmReqHandler)).Methods(http.MethodPost)
 
 	// access: все
 	authProtectedRouter.Handle("/delete", middleware.RequireEmailConfirmed(
