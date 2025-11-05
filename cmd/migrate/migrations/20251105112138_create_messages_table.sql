@@ -1,14 +1,14 @@
 -- +goose Up
 -- +goose StatementBegin
 CREATE TABLE IF NOT EXISTS messages (
-    id SERIAL PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     -- Временные метки
     created_at TIMESTAMPTZ NOT NULL DEFAULT (timezone('UTC', now())),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT (timezone('UTC', now())),
     deleted_at TIMESTAMPTZ,
     -- Пользователи
-    sender_uid BIGINT NOT NULL REFERENCES user_cores(user_uid) ON DELETE CASCADE, -- Получатель
-    receiver_uid BIGINT NOT NULL REFERENCES user_cores(user_uid) ON DELETE CASCADE, -- Отправитель
+    chat_id BIGINT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+    sender_uid BIGINT NOT NULL REFERENCES user_cores(user_uid) ON DELETE CASCADE, -- Отправитель
     -- Контент
     content TEXT NOT NULL,
     content_type VARCHAR(32) CHECK (content_type IN ('text', 'image', 'video', 'file', 'voice')) DEFAULT 'text',

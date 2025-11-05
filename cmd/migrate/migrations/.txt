@@ -1,0 +1,31 @@
+-- table: user_cores
+
+Основная системная информация о пользователе, его токены | email | password....
+
+-- table: user_profiles
+
+Публичная информация о пользователе, аватар | username
+
+-- table: user_actives
+
+Информация о пользователе, его действия например online/offline
+
+-- table: user_public_keys
+
+Информация о публичных ключей пользователя
+
+-- table: chats
+-- table: chat_members
+-- table: chat_last_messages
+
+-- table: messages
+
+Все сообщения пользователей, связанные с chat_id (sender_uid - кто отправил, receiver получаем с JOIN's на таблицу chat_members)
+
+-- table: message_statuses
+
+Информация для пользователя когда сообщение доставлено и прочитано другим пользователем
+
+-- table: message_edits
+
+Информация для пользователя(редактирование данных) кто отредактировал, новый content и старый.

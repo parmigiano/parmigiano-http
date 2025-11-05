@@ -14,14 +14,22 @@ type MessageStore struct {
 	logger *logger.Logger
 }
 
-func (s *MessageStore) Get_MessagesHistoryByReceiver(ctx context.Context, receiverUid, senderUid uint64) (*[]models.OnesMessage, error) {
+func (s *MessageStore) Get_MessagesHistoryByReceiver(ctx context.Context, myUserUid, otherUserUid uint64) (*[]models.OnesMessage, error) {
 	messages := []models.OnesMessage{}
 
 	query := `
+		WITH chat AS (
+			SELECT chats.id as chat_id
+			FROM chats
+			JOIN chat_members AS cm1 ON cm1.chat_id = chats.id AND cm1.user_uid = $1
+			JOIN chat_members AS cm2 ON cm2.chat_id = chats.id AND cm2.user_uid = $2
+			WHERE chats.chat_type = 'private'
+			LIMIT 1
+		)
 		SELECT
 			messages.id,
+			messages.chat_id,
 			messages.sender_uid,
-			messages.receiver_uid,
 			messages.content,
 			messages.content_type,
 			messages.is_edited,
@@ -30,21 +38,19 @@ func (s *MessageStore) Get_MessagesHistoryByReceiver(ctx context.Context, receiv
 			message_statuses.read_at,
 			message_edits.new_content AS edit_content
 		FROM messages
+		JOIN chat ON messages.chat_id = chat.chat_id
 		LEFT JOIN message_statuses
 			ON message_statuses.message_id = messages.id
 			AND message_statuses.receiver_uid = $1
 		LEFT JOIN message_edits
 			ON message_edits.message_id = messages.id
-		WHERE
-			(messages.sender_uid = $1 AND messages.receiver_uid = $2)
-			OR (messages.sender_uid = $2 AND messages.receiver_uid = $1)
-		ORDER BY messages.created_at ASC
+		ORDER BY messages.created_at ASC;
 	`
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	rows, err := s.db.QueryContext(ctx, query, receiverUid, senderUid)
+	rows, err := s.db.QueryContext(ctx, query, myUserUid, otherUserUid)
 	if err != nil {
 		if errors.Is(sql.ErrNoRows, err) {
 			return nil, nil
@@ -59,8 +65,8 @@ func (s *MessageStore) Get_MessagesHistoryByReceiver(ctx context.Context, receiv
 
 		err := rows.Scan(
 			&message.ID,
+			&message.ChatID,
 			&message.SenderUid,
-			&message.ReceiverUid,
 			&message.Content,
 			&message.ContentType,
 			&message.IsEdited,

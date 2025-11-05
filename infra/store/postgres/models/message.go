@@ -7,8 +7,8 @@ type Message struct {
 	CreatedAt   time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at" db:"updated_at"`
 	DeletedAt   *time.Time `json:"deleted_at,omitempty" db:"deleted_at"`
+	ChatID      uint64     `json:"chat_id" db:"chat_id"`
 	SenderUid   uint64     `json:"sender_uid" db:"sender_uid"`
-	ReceiverUid uint64     `json:"receiver_uid" db:"receiver_uid"`
 	Content     string     `json:"content" db:"content"`
 	ContentType string     `json:"content_type" db:"content_type"`
 	Attachments *string    `json:"attachments,omitempty" db:"attachments"`
@@ -36,8 +36,8 @@ type MessageEdit struct {
 
 type OnesMessage struct {
 	ID          uint64     `json:"id" db:"id"` // message id
+	ChatID      uint64     `json:"chat_id" db:"chat_id"`
 	SenderUid   uint64     `json:"sender_uid" db:"sender_uid"`
-	ReceiverUid uint64     `json:"receiver_uid" db:"receiver_uid"`
 	Content     string     `json:"content" db:"content"`
 	ContentType string     `json:"content_type" db:"content_type"`
 	IsEdited    bool       `json:"is_edited" db:"is_edited"`

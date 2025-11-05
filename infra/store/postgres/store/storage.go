@@ -13,8 +13,6 @@ type Storage struct {
 		Create_UserProfile(tx *sql.Tx, ctx context.Context, user *models.UserProfile) error
 		Create_UserActive(tx *sql.Tx, ctx context.Context, user *models.UserActive) error
 
-		Get_UsersWithLMessage(ctx context.Context, userUid uint64) (*[]models.UserMinimalWithLMessage, error)
-		Get_UserWithLMessage(ctx context.Context, userUid uint64) (*models.UserMinimalWithLMessage, error)
 		Get_UserInfoByAccessToken(ctx context.Context, token string) (*models.UserInfo, error)
 		Get_UserCoreByUid(ctx context.Context, userUid uint64) (*models.UserCore, error)
 		Get_UserProfileByUid(ctx context.Context, userUid uint64) (*models.UserProfile, error)
@@ -29,12 +27,21 @@ type Storage struct {
 	Messages interface { //nolint
 		Get_MessagesHistoryByReceiver(ctx context.Context, receiverUid, senderUid uint64) (*[]models.OnesMessage, error)
 	}
+	Chats interface { //nolint
+		Create_Chat(ctx context.Context, chat *models.Chat) (uint64, error)
+		Create_ChatMember(ctx context.Context, member *models.ChatMember) error
+
+		Get_ChatPrivateByUser(ctx context.Context, myUserUid, otherUserUid uint64) (*models.Chat, error)
+		Get_ChatsMyHistory(ctx context.Context, userUid uint64) (*[]models.ChatMinimalWithLMessage, error)
+		Get_ChatsBySearchUsername(ctx context.Context, myUserUid uint64, username string) (*[]models.ChatMinimalWithLMessage, error)
+	}
 }
 
 func NewStorage(db *sql.DB, logger *logger.Logger) Storage {
 	return Storage{
 		Users:    &UserStore{db, logger},
 		Messages: &MessageStore{db, logger},
+		Chats:    &ChatStore{db, logger},
 	}
 }
 

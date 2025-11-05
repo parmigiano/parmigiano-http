@@ -1,4 +1,4 @@
-package users
+package chats
 
 import (
 	"net/http"
@@ -7,16 +7,16 @@ import (
 	"parmigiano/http/types"
 )
 
-func (h *Handler) GetUsersWithLMessageHandler(w http.ResponseWriter, r *http.Request) error {
+func (h *Handler) GetChatsHandler(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 	authToken := ctx.Value("identity").(*types.AuthToken)
 
-	users, err := h.Store.Users.Get_UsersWithLMessage(ctx, authToken.User.UserUid)
+	chats, err := h.Store.Chats.Get_ChatsMyHistory(ctx, authToken.User.UserUid)
 	if err != nil {
 		h.Logger.Error("%v", err)
 		return httperr.Db(ctx, err)
 	}
 
-	httpx.HttpResponseWithETag(w, r, http.StatusOK, users)
+	httpx.HttpResponseWithETag(w, r, http.StatusOK, chats)
 	return nil
 }

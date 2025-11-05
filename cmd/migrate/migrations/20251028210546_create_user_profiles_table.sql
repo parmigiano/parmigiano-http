@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT (timezone('UTC', now())),
     user_uid BIGINT NOT NULL UNIQUE REFERENCES user_cores(user_uid) ON DELETE CASCADE,
     avatar VARCHAR(255),
+    name VARCHAR(25) NOT NULL,
     username VARCHAR(30) NOT NULL UNIQUE
 );
 

@@ -25,16 +25,16 @@ func renderHtml(title, message string) string {
 	<title>Подтверждение почты</title>
 	<style>
 	  body {
-      margin: 0;
-      padding: 0;
-      background-color: #000;
-      color: #fff;
-      font-family: "Segoe UI", Arial, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-    }
+		margin: 0;
+		padding: 0;
+		background-color: #000;
+		color: #fff;
+		display: flex;
+		justify-content: center;
+		align-items: center;
+		height: 100vh;
+		font-family: ui-sans-serif,system-ui,sans-serif,"Apple Color Emoji","Segoe UI Emoji",Segoe UI Symbol,"Noto Color Emoji";
+	}
 
     .container {
       	flex-direction: column;

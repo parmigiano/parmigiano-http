@@ -1,11 +1,8 @@
 package auth
 
 import (
-	"context"
 	"fmt"
 	"math/rand"
-	"parmigiano/http/handler/wsocket"
-	"parmigiano/http/infra/constants"
 	"parmigiano/http/infra/encryption"
 	"parmigiano/http/pkg"
 	"strings"
@@ -78,6 +75,7 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	UserProfileModel := &models.UserProfile{
 		UserUid:  uint64(uid),
 		Avatar:   nil,
+		Name:     payload.Name,
 		Username: payload.Username,
 	}
 
@@ -124,21 +122,6 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	}()
 	// ------------------------------
 	// send link to email for confirm
-
-	// send event 'register_new_user' for all users
-	go func(userUid uint64) {
-		user, err := h.Store.Users.Get_UserWithLMessage(context.Background(), userUid)
-		if err != nil {
-			h.Logger.Error("%v", err)
-			return
-		}
-
-		hub := wsocket.GetHub()
-		hub.Broadcast(map[string]any{
-			"event": constants.EVENT_USER_NEW_REGISTER,
-			"data":  user,
-		})
-	}(UserActiveModel.UserUid)
 
 	httpx.HttpResponse(w, r, http.StatusCreated, token)
 	return nil

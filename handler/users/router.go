@@ -16,10 +16,10 @@ func (h *Handler) RegisterRoutes(router *mux.Router) {
 	userRouter.Handle("/me", httpx.ErrorHandler(h.GetUserMeHandler)).Methods(http.MethodGet)
 
 	// access: все
-	userRouter.Handle("/last-messages", httpx.ErrorHandler(h.GetUsersWithLMessageHandler)).Methods(http.MethodGet)
-
-	// access: все
 	userRouter.Handle("/upload/avatar", middleware.RequireEmailConfirmed(
 		httpx.ErrorHandler(h.UserUpdateAvatarHandler),
 	)).Methods(http.MethodPost)
+
+	// access: все
+	userRouter.Handle("/find/{username}", httpx.ErrorHandler(h.UsersFindByUsernameHandler)).Methods(http.MethodGet)
 }

@@ -8,6 +8,7 @@ type UserProfile struct {
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 	UserUid   uint64    `json:"user_uid" db:"user_uid"`
 	Avatar    *string   `json:"avatar" db:"avatar"`
+	Name      string    `json:"name" db:"name"`
 	Username  string    `json:"username" db:"username"`
 }
 
@@ -37,6 +38,7 @@ type UserInfo struct {
 	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
 	UserUid        uint64    `json:"user_uid" db:"user_uid"`
 	Avatar         *string   `json:"avatar" db:"avatar"`
+	Name           string    `json:"name" db:"name"`
 	Username       string    `json:"username" db:"username"`
 	Email          string    `json:"email" db:"email"`
 	EmailConfirmed bool      `json:"email_confirmed" db:"email_confirmed"`
