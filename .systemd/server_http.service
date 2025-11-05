@@ -3,17 +3,24 @@ Description=Go HTTPs Server
 After=network.target
 
 [Service]
+# даём время освободить порт
+ExecStartPre=/bin/sleep 2
+
+# запуск сервера
 ExecStart=/root/parmigiano-http/bin/server-http
 WorkingDirectory=/root/parmigiano-http
-Restart=always
-RestartSec=5s
-StartLimitBurst=10
-StartLimitIntervalSec=60
+
+ExecStop=/bin/bash -c 'sleep 1 && killall server-http || true'
+
+# настройки перезапуска
+Restart=on-failure
+RestartSec=10s
+TimeoutStopSec=10s
+KillSignal=SIGINT
+
 User=root
 Group=root
-Environment="PORT=8080"
 LimitNOFILE=1048576
-
 NoNewPrivileges=yes
 
 [Install]
