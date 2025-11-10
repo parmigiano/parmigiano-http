@@ -3,8 +3,10 @@ package auth
 import (
 	"fmt"
 	"math/rand"
-	"parmigiano/http/infra/encryption"
+	"parmigiano/http/infra/constants"
 	"parmigiano/http/pkg"
+	"parmigiano/http/pkg/security"
+	"regexp"
 	"strings"
 
 	"net/http"
@@ -37,7 +39,23 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 		return httperr.BadRequest("не все поля заполнены")
 	}
 
-	token := util.HashTo255(fmt.Sprintf("%s:%s:%s", payload.Username, payload.Email, time.Now().String()))
+	valid := regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
+	if !valid.MatchString(payload.Name) {
+		return httperr.BadRequest("недопустимые символы в имени")
+	}
+
+	if !valid.MatchString(payload.Username) {
+		return httperr.BadRequest("недопустимые символы в имени пользователя")
+	}
+
+	password := strings.ToLower(strings.TrimSpace(payload.Password))
+	email := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(payload.Email), " ", ""))
+
+	if _, chPass := constants.CheckSimplePasswords[password]; chPass {
+		return httperr.BadRequest("пароль слишком простой, введите новый")
+	}
+
+	token := util.HashTo255(fmt.Sprintf("%s:%s:%s", payload.Username, email, time.Now().String()))
 
 	tx, err := h.Db.BeginTx(ctx, nil)
 	if err != nil {
@@ -52,17 +70,15 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	rnd := rand.New(rand.NewSource(time.Now().UnixNano()))
 	uid := rnd.Intn(9000000000) + 1000000000
 
-	pass, err := encryption.Encrypt(payload.Password)
+	pass, err := security.HashPassword(password)
 	if err != nil {
 		h.Logger.Error("%v", err)
-		return httperr.InternalServerError(err.Error())
+		return httperr.InternalServerError("ошибка при создании пользователя")
 	}
-
-	payload.Email = strings.ToLower(strings.ReplaceAll(strings.TrimSpace(payload.Email), " ", ""))
 
 	UserCore := &models.UserCore{
 		UserUid:     uint64(uid),
-		Email:       payload.Email,
+		Email:       email,
 		Password:    pass,
 		AccessToken: token,
 	}
@@ -112,7 +128,9 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 					%s
 				</a>
 
-				<p>Срок действия ссылки истечет через 30 минут...</p>
+				<p>Срок действия ссылки истечет через 24 часа...</p>
+
+				<p>P.S. Данное письмо сгенерировано и отправлено автоматически. Пожалуйста, не отвечайте на него</p>
 			</body>
 		`, UserCore.Email, link, link)); errSendEmail != nil {
 			h.Logger.Error("%v", errSendEmail)

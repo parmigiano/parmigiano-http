@@ -4,9 +4,12 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"parmigiano/http/config"
 	"parmigiano/http/infra/constants"
+	"runtime"
 	"strconv"
+	"time"
 )
 
 func (s *httpServer) httpStart() error {
@@ -17,16 +20,9 @@ func (s *httpServer) httpStart() error {
 
 	routes := s.routes()
 
-	fmt.Println("\n" + `  _    _ _______ _______ _____
- | |  | |__   __|__   __|  __ \
- | |__| |  | |     | |  | |__) |
- |  __  |  | |     | |  |  ___/
- | |  | |  | |     | |  | |
- |_|  |_|  |_|     |_|  |_|
-
-                                `)
-
-	fmt.Printf("[INFO] Listening on :%d\n", port)
+	fmt.Printf("\n[%v] [INFO] Http server started %s:%d\n", time.Now().Format("2006-01-02 15:04:05"), config.ServerAddr, port)
+	fmt.Printf("[%v] [INFO] Proccess PID: %d, Version: beta\n", time.Now().Format("2006-01-02 15:04:05"), os.Getpid())
+	fmt.Printf("[%v] [INFO] Golang version: %s\n\n", time.Now().Format("2006-01-02 15:04:05"), runtime.Version())
 
 	httpServe := &http.Server{
 		Addr:         fmt.Sprintf(":%d", port),

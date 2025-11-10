@@ -16,6 +16,9 @@ func (h *Handler) RegisterRoutes(router *mux.Router) {
 	userRouter.Handle("/me", httpx.ErrorHandler(h.GetUserMeHandler)).Methods(http.MethodGet)
 
 	// access: все
+	userRouter.Handle("/me", httpx.ErrorHandler(h.UserUpdateProfile)).Methods(http.MethodPatch)
+
+	// access: все
 	userRouter.Handle("/upload/avatar", middleware.RequireEmailConfirmed(
 		httpx.ErrorHandler(h.UserUpdateAvatarHandler),
 	)).Methods(http.MethodPost)

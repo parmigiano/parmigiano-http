@@ -11,6 +11,7 @@ import (
 	"parmigiano/http/types"
 	"parmigiano/http/util"
 	"strconv"
+	"strings"
 
 	"github.com/go-playground/validator"
 )
@@ -162,17 +163,19 @@ func (h *Handler) AuthEmailConfirmReqHandler(w http.ResponseWriter, r *http.Requ
 		return httperr.BadRequest("не все поля заполнены")
 	}
 
+	email := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(payload.Email), " ", ""))
+
 	// send link to email for confirm
 	// ------------------------------
 	link := util.GenerateVerificationEmailLink(authToken.User.UserUid)
 
-	if err := h.Store.Users.Update_UserEmailByUid(ctx, authToken.User.UserUid, payload.Email); err != nil {
+	if err := h.Store.Users.Update_UserEmailByUid(ctx, authToken.User.UserUid, email); err != nil {
 		h.Logger.Error("%v", err)
 		return httperr.Db(ctx, err)
 	}
 
 	go func() {
-		if errSendEmail := pkg.SendEmail(payload.Email, "Подтверждения адреса электронной почты ParmigianoChat", fmt.Sprintf(`
+		if errSendEmail := pkg.SendEmail(email, "Подтверждения адреса электронной почты ParmigianoChat", fmt.Sprintf(`
 			<body>
 				<p>Мы получили запрос на использование адреса электронной почты <b>%s</b></p>
 				<p>Чтобы завершить настройку, перейдите по ссылке для подтверждения электронной почты:</p>
@@ -183,11 +186,11 @@ func (h *Handler) AuthEmailConfirmReqHandler(w http.ResponseWriter, r *http.Requ
 
 				<p>Срок действия ссылки истечет через 30 минут...</p>
 			</body>
-		`, payload.Email, link, link)); errSendEmail != nil {
+		`, email, link, link)); errSendEmail != nil {
 			h.Logger.Error("%v", errSendEmail)
 		}
 
-		h.Logger.Info("Reset link for %s: %s", payload.Email, link)
+		h.Logger.Info("Reset link for %s: %s", email, link)
 	}()
 	// ------------------------------
 	// send link to email for confirm

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"parmigiano/http/infra/logger"
 	"parmigiano/http/infra/store/postgres/models"
 	"parmigiano/http/pkg/httpx/httperr"
@@ -276,6 +277,82 @@ func (s *UserStore) Update_UserEmailByUid(ctx context.Context, userUid uint64, e
 	defer cancel()
 
 	_, err := s.db.ExecContext(ctx, query, email, userUid)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *UserStore) Update_UserCoreByUid(ctx context.Context, tx *sql.Tx, user *models.UserProfileUpd) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	fields := []string{}
+	values := []interface{}{}
+	i := 1
+
+	if user.Email != nil {
+		fields = append(fields, fmt.Sprintf("email=$%d", i))
+		values = append(values, *user.Email)
+		i++
+	}
+
+	if user.Password != nil {
+		fields = append(fields, fmt.Sprintf("password=$%d", i))
+		values = append(values, *user.Password)
+		i++
+	}
+
+	if len(fields) == 0 {
+		return nil
+	}
+
+	query := fmt.Sprintf(`
+		UPDATE user_cores SET %s WHERE user_uid = $%d
+	`, strings.Join(fields, ", "), i)
+
+	values = append(values, user.UserUid)
+
+	_, err := tx.ExecContext(ctx, query, values...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *UserStore) Update_UserProfileByUid(ctx context.Context, tx *sql.Tx, user *models.UserProfileUpd) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	fields := []string{}
+	values := []interface{}{}
+	i := 1
+
+	if user.Username != nil {
+		fields = append(fields, fmt.Sprintf("username=$%d", i))
+		values = append(values, *user.Username)
+		i++
+	}
+
+	if user.Name != nil {
+		fields = append(fields, fmt.Sprintf("name=$%d", i))
+		values = append(values, *user.Name)
+		i++
+	}
+
+	if len(fields) == 0 {
+		return nil
+	}
+
+	query := fmt.Sprintf(`
+		UPDATE user_profiles SET %s WHERE user_uid = $%d
+	`, strings.Join(fields, ", "), i)
+
+	values = append(values, user.UserUid)
+
+	_, err := tx.ExecContext(ctx, query, values...)
 	if err != nil {
 		return err
 	}

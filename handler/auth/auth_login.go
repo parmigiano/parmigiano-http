@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"parmigiano/http/infra/encryption"
+	"parmigiano/http/pkg/security"
 	"strings"
 
 	"net/http"
@@ -31,15 +31,10 @@ func (h *Handler) AuthLoginUserHandler(w http.ResponseWriter, r *http.Request) e
 		return httperr.BadRequest("не все поля заполнены")
 	}
 
-	payload.Email = strings.ToLower(strings.ReplaceAll(strings.TrimSpace(payload.Email), " ", ""))
-
-	pass, err := encryption.Encrypt(payload.Password)
-	if err != nil {
-		h.Logger.Error("%v", err)
-		return httperr.InternalServerError(err.Error())
-	}
-
-	user, err := h.Store.Users.Get_UserCoreByEmail(ctx, payload.Email)
+	password := strings.ToLower(strings.TrimSpace(payload.Password))
+	email := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(payload.Email), " ", ""))
+	
+	user, err := h.Store.Users.Get_UserCoreByEmail(ctx, email)
 	if err != nil {
 		h.Logger.Error("%v", err)
 		return httperr.Db(ctx, err)
@@ -49,8 +44,12 @@ func (h *Handler) AuthLoginUserHandler(w http.ResponseWriter, r *http.Request) e
 		return httperr.NotFound("пользователь не был найден")
 	}
 
-	if user.Password != pass {
+	if !security.CheckPassword(password, user.Password) {
 		return httperr.NotFound("пользователь не был найден")
+	}
+
+	if !user.EmailConfirmed {
+		return httperr.Conflict("электронная почта не подтверждена, письмо отправлено")
 	}
 
 	httpx.HttpResponse(w, r, http.StatusOK, user.AccessToken)

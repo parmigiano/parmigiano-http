@@ -2,6 +2,7 @@ package models
 
 import "time"
 
+// database model
 type UserProfile struct {
 	ID        uint64    `json:"id" db:"id"`
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
@@ -30,6 +31,15 @@ type UserCore struct {
 	Password       string    `json:"password" db:"password"`
 	AccessToken    string    `json:"access_token" db:"access_token"`
 	RefreshToken   *string   `json:"refresh_token" db:"refresh_token"`
+}
+
+// dop. models
+type UserProfileUpd struct {
+	UserUid  uint64  `json:"user_uid" db:"user_uid"`
+	Username *string `json:"username" db:"username"`
+	Name     *string `json:"name" db:"name"`
+	Email    *string `json:"email" db:"email"`
+	Password *string `json:"password" db:"password"`
 }
 
 type UserInfo struct {

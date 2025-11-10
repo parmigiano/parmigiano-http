@@ -20,6 +20,8 @@ type Storage struct {
 
 		Update_UserEmailConfirmedByUid(ctx context.Context, userUid uint64, confirmed bool) error
 		Update_UserEmailByUid(ctx context.Context, userUid uint64, email string) error
+		Update_UserCoreByUid(ctx context.Context, tx *sql.Tx, user *models.UserProfileUpd) error
+		Update_UserProfileByUid(ctx context.Context, tx *sql.Tx, user *models.UserProfileUpd) error
 		Update_UserAvatarByUid(ctx context.Context, userUid uint64, avatar string) error
 
 		Delete_UserByUid(ctx context.Context, userUid uint64) error
