@@ -1,0 +1,32 @@
+-- +goose Up
+-- +goose StatementBegin
+CREATE TABLE IF NOT EXISTS user_profile_accesses (
+    id SERIAL PRIMARY KEY,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT (timezone('UTC', now())),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT (timezone('UTC', now())),
+    user_uid BIGINT NOT NULL UNIQUE REFERENCES user_cores(user_uid) ON DELETE CASCADE,
+    email_visible BOOLEAN NOT NULL DEFAULT TRUE,
+    username_visible BOOLEAN NOT NULL DEFAULT TRUE,
+    phone_visible BOOLEAN NOT NULL DEFAULT FALSE
+);
+
+CREATE OR REPLACE FUNCTION set_updated_at_user_profile_accesses()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = NOW();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER set_updated_at_user_profile_accesses_trigger
+    BEFORE UPDATE ON user_profile_accesses
+    FOR EACH ROW
+    EXECUTE FUNCTION set_updated_at_user_profile_accesses();
+-- +goose StatementEnd
+
+-- +goose Down
+-- +goose StatementBegin
+DROP TRIGGER IF EXISTS set_updated_at_user_profile_accesses_trigger ON user_profile_accesses;
+DROP FUNCTION IF EXISTS set_updated_at_user_profile_accesses();
+DROP TABLE IF EXISTS user_profile_accesses;
+-- +goose StatementEnd

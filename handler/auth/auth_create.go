@@ -3,9 +3,12 @@ package auth
 import (
 	"fmt"
 	"math/rand"
+	"parmigiano/http/config"
 	"parmigiano/http/infra/constants"
+	"parmigiano/http/infra/encryption"
 	"parmigiano/http/pkg"
 	"parmigiano/http/pkg/security"
+	"parmigiano/http/types"
 	"regexp"
 	"strings"
 
@@ -39,6 +42,10 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 		return httperr.BadRequest("не все поля заполнены")
 	}
 
+	// clear spaces
+	payload.Name = strings.TrimSpace(payload.Name)
+	payload.Username = strings.TrimSpace(payload.Username)
+
 	valid := regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 	if !valid.MatchString(payload.Name) {
 		return httperr.BadRequest("недопустимые символы в имени")
@@ -54,8 +61,6 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	if _, chPass := constants.CheckSimplePasswords[password]; chPass {
 		return httperr.BadRequest("пароль слишком простой, введите новый")
 	}
-
-	token := util.HashTo255(fmt.Sprintf("%s:%s:%s", payload.Username, email, time.Now().String()))
 
 	tx, err := h.Db.BeginTx(ctx, nil)
 	if err != nil {
@@ -77,10 +82,9 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	UserCore := &models.UserCore{
-		UserUid:     uint64(uid),
-		Email:       email,
-		Password:    pass,
-		AccessToken: token,
+		UserUid:  uint64(uid),
+		Email:    email,
+		Password: pass,
 	}
 
 	if errUserCore := h.Store.Users.Create_UserCore(tx, ctx, UserCore); errUserCore != nil {
@@ -96,6 +100,18 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	if err := h.Store.Users.Create_UserProfile(tx, ctx, UserProfileModel); err != nil {
+		h.Logger.Error("%v", err)
+		return httperr.Db(ctx, err)
+	}
+
+	UserProfileAccessModel := &models.UserProfileAccess{
+		UserUid:         uint64(uid),
+		UsernameVisible: true,
+		EmailVisible:    true,
+		PhoneVisible:    false,
+	}
+
+	if err := h.Store.Users.Create_UserProfileAccess(tx, ctx, UserProfileAccessModel); err != nil {
 		h.Logger.Error("%v", err)
 		return httperr.Db(ctx, err)
 	}
@@ -141,6 +157,19 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	// ------------------------------
 	// send link to email for confirm
 
-	httpx.HttpResponse(w, r, http.StatusCreated, token)
+	ReqAuthToken := &types.ReqAuthToken{
+		UID:       UserCore.UserUid,
+		Timestamp: time.Now(),
+	}
+
+	authTokenString, _ := config.JSON.Marshal(ReqAuthToken)
+
+	authTokenResp, err := encryption.Encrypt(string(authTokenString))
+	if err != nil {
+		h.Logger.Error("%v", err)
+		return httperr.InternalServerError(err.Error())
+	}
+
+	httpx.HttpResponse(w, r, http.StatusCreated, authTokenResp)
 	return nil
 }

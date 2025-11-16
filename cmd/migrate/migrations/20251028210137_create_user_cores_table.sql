@@ -7,9 +7,7 @@ CREATE TABLE IF NOT EXISTS user_cores (
     user_uid BIGINT NOT NULL UNIQUE,
     email VARCHAR(100) NOT NULL UNIQUE,
     email_confirmed BOOLEAN DEFAULT FALSE,
-    password VARCHAR(255) NOT NULL,
-    access_token VARCHAR(255) NOT NULL UNIQUE,
-    refresh_token VARCHAR(255) UNIQUE
+    password VARCHAR(255) NOT NULL
 );
 
 CREATE OR REPLACE FUNCTION set_updated_at_user_cores()

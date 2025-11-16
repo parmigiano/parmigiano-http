@@ -4,10 +4,13 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"parmigiano/http/config"
 	"parmigiano/http/handler"
+	"parmigiano/http/infra/encryption"
 	"parmigiano/http/pkg/httpx"
 	"parmigiano/http/types"
 	"strings"
+	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -40,8 +43,29 @@ func IsAuthenticatedMiddleware(h *handler.BaseHandler) mux.MiddlewareFunc {
 				return
 			}
 
+			ReqAuthTokenDecrypted, err := encryption.Decrypt(token)
+			if err != nil {
+				h.Logger.Error("%v", err)
+
+				httpx.HttpResponse(w, r, http.StatusUnauthorized, "ошибка проверки токена, попробуйте позже")
+				return
+			}
+
+			var ReqAuthToken types.ReqAuthToken
+			if err := config.JSON.Unmarshal([]byte(ReqAuthTokenDecrypted), &ReqAuthToken); err != nil {
+				h.Logger.Error("%v", err)
+
+				httpx.HttpResponse(w, r, http.StatusUnauthorized, "ошибка проверки токена, попробуйте позже")
+				return
+			}
+
+			if !time.Now().Before(ReqAuthToken.Timestamp.Add(7 * 24 * time.Hour)) {
+				httpx.HttpResponse(w, r, http.StatusUnauthorized, "пожалуйста, подключитесь к учетной записи")
+				return
+			}
+
 			// db: get user core
-			user, err := h.Store.Users.Get_UserInfoByAccessToken(r.Context(), token)
+			user, err := h.Store.Users.Get_UserInfoByUserUid(r.Context(), ReqAuthToken.UID)
 			if err != nil {
 				h.Logger.Error("%v", err)
 

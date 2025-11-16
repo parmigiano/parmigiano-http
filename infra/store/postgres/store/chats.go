@@ -89,7 +89,7 @@ func (s *ChatStore) Get_ChatsMyHistory(ctx context.Context, userUid uint64) (*[]
 
 	query := `
 		SELECT DISTINCT
-			user_cores.id,
+			chats.id,
 			user_profiles.name,
 			user_profiles.username,
 			user_profiles.avatar,
@@ -209,8 +209,10 @@ func (s *ChatStore) Get_ChatsBySearchUsername(ctx context.Context, myUserUid uin
 				AND messages.sender_uid = user_cores.user_uid
       			AND (message_statuses.read_at IS NULL)
 		) AS unread_count ON TRUE
-		WHERE user_cores.user_uid != $1 AND user_profiles.username ILIKE '%' || $2 || '%'
-		ORDER BY COALESCE(last_message.created_at, user_cores.created_at) DESC
+		WHERE user_cores.user_uid != $1 AND (
+			similarity(user_profiles.username, $2) > 0.6
+		)
+		ORDER BY similarity(user_profiles.username, $2) DESC, user_profiles.username ASC
 	`
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

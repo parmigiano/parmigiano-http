@@ -177,16 +177,15 @@ func (h *Handler) AuthEmailConfirmReqHandler(w http.ResponseWriter, r *http.Requ
 	go func() {
 		if errSendEmail := pkg.SendEmail(email, "Подтверждения адреса электронной почты ParmigianoChat", fmt.Sprintf(`
 			<body>
-				<p>Мы получили запрос на использование адреса электронной почты <b>%s</b></p>
 				<p>Чтобы завершить настройку, перейдите по ссылке для подтверждения электронной почты:</p>
 
 				<a href="%s">
 					%s
 				</a>
 
-				<p>Срок действия ссылки истечет через 30 минут...</p>
+				<p>Срок действия ссылки истечет через 24 часа...</p>
 			</body>
-		`, email, link, link)); errSendEmail != nil {
+		`, link, link)); errSendEmail != nil {
 			h.Logger.Error("%v", errSendEmail)
 		}
 

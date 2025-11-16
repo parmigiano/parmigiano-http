@@ -1,8 +1,12 @@
 package auth
 
 import (
+	"parmigiano/http/config"
+	"parmigiano/http/infra/encryption"
 	"parmigiano/http/pkg/security"
+	"parmigiano/http/types"
 	"strings"
+	"time"
 
 	"net/http"
 	"parmigiano/http/pkg/httpx"
@@ -33,7 +37,7 @@ func (h *Handler) AuthLoginUserHandler(w http.ResponseWriter, r *http.Request) e
 
 	password := strings.ToLower(strings.TrimSpace(payload.Password))
 	email := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(payload.Email), " ", ""))
-	
+
 	user, err := h.Store.Users.Get_UserCoreByEmail(ctx, email)
 	if err != nil {
 		h.Logger.Error("%v", err)
@@ -52,6 +56,19 @@ func (h *Handler) AuthLoginUserHandler(w http.ResponseWriter, r *http.Request) e
 		return httperr.Conflict("электронная почта не подтверждена, письмо отправлено")
 	}
 
-	httpx.HttpResponse(w, r, http.StatusOK, user.AccessToken)
+	ReqAuthToken := &types.ReqAuthToken{
+		UID:       user.UserUid,
+		Timestamp: time.Now(),
+	}
+
+	authTokenString, _ := config.JSON.Marshal(ReqAuthToken)
+
+	authTokenResp, err := encryption.Encrypt(string(authTokenString))
+	if err != nil {
+		h.Logger.Error("%v", err)
+		return httperr.InternalServerError(err.Error())
+	}
+
+	httpx.HttpResponse(w, r, http.StatusOK, authTokenResp)
 	return nil
 }

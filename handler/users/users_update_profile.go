@@ -72,11 +72,16 @@ func (h *Handler) UserUpdateProfile(w http.ResponseWriter, r *http.Request) erro
 	}()
 
 	UserProfileUpd := &models.UserProfileUpd{
-		UserUid:  authToken.User.UserUid,
-		Name:     payload.Name,
-		Username: payload.Username,
-		Email:    emailPtr,
-		Password: passwordPtr,
+		UserUid:         authToken.User.UserUid,
+		Overview:        payload.Overview,
+		Name:            payload.Name,
+		Username:        payload.Username,
+		UsernameVisible: payload.UsernameVisible,
+		Email:           emailPtr,
+		EmailVisible:    payload.EmailVisible,
+		Phone:           payload.Phone,
+		PhoneVisible:    payload.PhoneVisible,
+		Password:        passwordPtr,
 	}
 
 	if err := h.Store.Users.Update_UserCoreByUid(ctx, tx, UserProfileUpd); err != nil {
@@ -85,6 +90,11 @@ func (h *Handler) UserUpdateProfile(w http.ResponseWriter, r *http.Request) erro
 	}
 
 	if err := h.Store.Users.Update_UserProfileByUid(ctx, tx, UserProfileUpd); err != nil {
+		h.Logger.Error("%v", err)
+		return httperr.Db(ctx, err)
+	}
+
+	if err := h.Store.Users.Update_UserProfileAccessByUid(ctx, tx, UserProfileUpd); err != nil {
 		h.Logger.Error("%v", err)
 		return httperr.Db(ctx, err)
 	}

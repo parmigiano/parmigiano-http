@@ -19,13 +19,13 @@ type UserStore struct {
 
 func (s *UserStore) Create_UserCore(tx *sql.Tx, ctx context.Context, user *models.UserCore) error {
 	query := `
-		INSERT INTO user_cores (user_uid, email, password, access_token) VALUES ($1, $2, $3, $4)
+		INSERT INTO user_cores (user_uid, email, password) VALUES ($1, $2, $3)
 	`
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	_, err := tx.ExecContext(ctx, query, user.UserUid, user.Email, user.Password, user.AccessToken)
+	_, err := tx.ExecContext(ctx, query, user.UserUid, user.Email, user.Password)
 	if err != nil {
 		if strings.Contains(err.Error(), `user_cores_email_key`) {
 			return httperr.Err_DuplicateEmail
@@ -47,10 +47,22 @@ func (s *UserStore) Create_UserProfile(tx *sql.Tx, ctx context.Context, user *mo
 
 	_, err := tx.ExecContext(ctx, query, user.UserUid, user.Avatar, user.Name, user.Username)
 	if err != nil {
-		if strings.Contains(err.Error(), `user_cores_email_key`) {
-			return httperr.Err_DuplicateEmail
-		}
+		return err
+	}
 
+	return nil
+}
+
+func (s *UserStore) Create_UserProfileAccess(tx *sql.Tx, ctx context.Context, user *models.UserProfileAccess) error {
+	query := `
+		INSERT INTO user_profile_accesses (user_uid, email_visible, username_visible, phone_visible) VALUES ($1, $2, $3, $4)
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	_, err := tx.ExecContext(ctx, query, user.UserUid, user.EmailVisible, user.UsernameVisible, user.PhoneVisible)
+	if err != nil {
 		return err
 	}
 
@@ -73,45 +85,52 @@ func (s *UserStore) Create_UserActive(tx *sql.Tx, ctx context.Context, user *mod
 	return nil
 }
 
-func (s *UserStore) Get_UserInfoByAccessToken(ctx context.Context, token string) (*models.UserInfo, error) {
+func (s *UserStore) Get_UserInfoByUserUid(ctx context.Context, userUid uint64) (*models.UserInfo, error) {
 	user := models.UserInfo{}
 
 	query := `
 		SELECT
 			user_cores.id,
 			user_cores.created_at,
-			user_cores.updated_at,
 			user_cores.user_uid,
+			user_actives.online,
+			user_actives.updated_at as last_online_date,
 			user_profiles.avatar,
 			user_profiles.name,
 			user_profiles.username,
+			user_profile_accesses.username_visible,
 			user_cores.email,
+			user_profile_accesses.email_visible,
 			user_cores.email_confirmed,
-			user_cores.access_token,
-			user_cores.refresh_token
+			user_profiles.phone,
+			user_profiles.overview
 		FROM user_cores
 		LEFT JOIN user_profiles ON user_cores.user_uid = user_profiles.user_uid
-		WHERE user_cores.access_token = $1
+		LEFT JOIN user_profile_accesses ON user_cores.user_uid = user_profile_accesses.user_uid
+		LEFT JOIN user_actives ON user_cores.user_uid = user_actives.user_uid
+		WHERE user_cores.user_uid = $1
 		LIMIT 1
 	`
-
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	row := s.db.QueryRowContext(ctx, query, token)
+	row := s.db.QueryRowContext(ctx, query, userUid)
 
 	if err := row.Scan(
 		&user.ID,
 		&user.CreatedAt,
-		&user.UpdatedAt,
 		&user.UserUid,
+		&user.Online,
+		&user.LastOnlineDate,
 		&user.Avatar,
 		&user.Name,
 		&user.Username,
+		&user.UsernameVisible,
 		&user.Email,
+		&user.EmailVisible,
 		&user.EmailConfirmed,
-		&user.AccessToken,
-		&user.RefreshToken,
+		&user.Phone,
+		&user.Overview,
 	); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
@@ -132,9 +151,7 @@ func (s *UserStore) Get_UserCoreByUid(ctx context.Context, userUid uint64) (*mod
 		    user_uid,
 		    email,
 			email_confirmed,
-			password,
-		    access_token,
-		    refresh_token
+			password
 		FROM user_cores
 		WHERE user_uid = $1
 		LIMIT 1
@@ -151,8 +168,6 @@ func (s *UserStore) Get_UserCoreByUid(ctx context.Context, userUid uint64) (*mod
 		&user.Email,
 		&user.EmailConfirmed,
 		&user.Password,
-		&user.AccessToken,
-		&user.RefreshToken,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -172,7 +187,9 @@ func (s *UserStore) Get_UserProfileByUid(ctx context.Context, userUid uint64) (*
 		    id,
 		    user_uid,
 		    avatar,
-			username
+			username,
+			overview,
+			phone
 		FROM user_profiles
 		WHERE user_uid = $1
 		LIMIT 1
@@ -183,7 +200,7 @@ func (s *UserStore) Get_UserProfileByUid(ctx context.Context, userUid uint64) (*
 
 	row := s.db.QueryRowContext(ctx, query, userUid)
 
-	if err := row.Scan(&user.ID, &user.UserUid, &user.Avatar, &user.Username); err != nil {
+	if err := row.Scan(&user.ID, &user.UserUid, &user.Avatar, &user.Username, &user.Overview, &user.Phone); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
 		}
@@ -203,9 +220,7 @@ func (s *UserStore) Get_UserCoreByEmail(ctx context.Context, email string) (*mod
 		    user_uid,
 		    email,
 			email_confirmed,
-			password,
-		    access_token,
-		    refresh_token
+			password
 		FROM user_cores
 		WHERE email = $1
 		LIMIT 1
@@ -222,8 +237,6 @@ func (s *UserStore) Get_UserCoreByEmail(ctx context.Context, email string) (*mod
 		&user.Email,
 		&user.EmailConfirmed,
 		&user.Password,
-		&user.AccessToken,
-		&user.RefreshToken,
 	); err != nil {
 		if err == sql.ErrNoRows {
 			return nil, nil
@@ -342,12 +355,68 @@ func (s *UserStore) Update_UserProfileByUid(ctx context.Context, tx *sql.Tx, use
 		i++
 	}
 
+	if user.Overview != nil {
+		fields = append(fields, fmt.Sprintf("overview=$%d", i))
+		values = append(values, *user.Overview)
+		i++
+	}
+
+	if user.Phone != nil {
+		fields = append(fields, fmt.Sprintf("phone=$%d", i))
+		values = append(values, *user.Phone)
+		i++
+	}
+
 	if len(fields) == 0 {
 		return nil
 	}
 
 	query := fmt.Sprintf(`
 		UPDATE user_profiles SET %s WHERE user_uid = $%d
+	`, strings.Join(fields, ", "), i)
+
+	values = append(values, user.UserUid)
+
+	_, err := tx.ExecContext(ctx, query, values...)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *UserStore) Update_UserProfileAccessByUid(ctx context.Context, tx *sql.Tx, user *models.UserProfileUpd) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	fields := []string{}
+	values := []interface{}{}
+	i := 1
+
+	if user.UsernameVisible != nil {
+		fields = append(fields, fmt.Sprintf("username_visible=$%d", i))
+		values = append(values, *user.UsernameVisible)
+		i++
+	}
+
+	if user.EmailVisible != nil {
+		fields = append(fields, fmt.Sprintf("email_visible=$%d", i))
+		values = append(values, *user.EmailVisible)
+		i++
+	}
+
+	if user.PhoneVisible != nil {
+		fields = append(fields, fmt.Sprintf("phone_visible=$%d", i))
+		values = append(values, *user.PhoneVisible)
+		i++
+	}
+
+	if len(fields) == 0 {
+		return nil
+	}
+
+	query := fmt.Sprintf(`
+		UPDATE user_profile_accesses SET %s WHERE user_uid = $%d
 	`, strings.Join(fields, ", "), i)
 
 	values = append(values, user.UserUid)
@@ -392,6 +461,23 @@ func (s *UserStore) Delete_UserByUid(ctx context.Context, userUid uint64) error 
 	delRows, _ := del.RowsAffected()
 	if delRows == 0 {
 		return httperr.Err_NotDeleted
+	}
+
+	return nil
+}
+
+func (s *UserStore) Delete_UserIfEmailNotConfirmed(ctx context.Context) error {
+	query := `
+		DELETE FROM user_cores 
+		WHERE email_confirmed = false AND created_at < $1
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	_, err := s.db.ExecContext(ctx, query, time.Now().AddDate(0, 0, -7))
+	if err != nil {
+		return err
 	}
 
 	return nil

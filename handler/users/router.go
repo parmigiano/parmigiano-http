@@ -25,4 +25,7 @@ func (h *Handler) RegisterRoutes(router *mux.Router) {
 
 	// access: все
 	userRouter.Handle("/find/{username}", httpx.ErrorHandler(h.UsersFindByUsernameHandler)).Methods(http.MethodGet)
+
+	// access: все
+	userRouter.Handle("/{uid}", httpx.ErrorHandler(h.GetUserProfileHandler)).Methods(http.MethodGet)
 }

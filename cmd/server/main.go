@@ -49,6 +49,9 @@ func main() {
 		store:  store,
 	}
 
+	// cron
+	server.checkUserIfEmailNotConfirmed()
+
 	// start http server
 	if err := server.httpStart(); err != nil {
 		log.Error(err.Error())

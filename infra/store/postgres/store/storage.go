@@ -11,9 +11,10 @@ type Storage struct {
 	Users interface { //nolint
 		Create_UserCore(tx *sql.Tx, ctx context.Context, user *models.UserCore) error
 		Create_UserProfile(tx *sql.Tx, ctx context.Context, user *models.UserProfile) error
+		Create_UserProfileAccess(tx *sql.Tx, ctx context.Context, user *models.UserProfileAccess) error
 		Create_UserActive(tx *sql.Tx, ctx context.Context, user *models.UserActive) error
 
-		Get_UserInfoByAccessToken(ctx context.Context, token string) (*models.UserInfo, error)
+		Get_UserInfoByUserUid(ctx context.Context, userUid uint64) (*models.UserInfo, error)
 		Get_UserCoreByUid(ctx context.Context, userUid uint64) (*models.UserCore, error)
 		Get_UserProfileByUid(ctx context.Context, userUid uint64) (*models.UserProfile, error)
 		Get_UserCoreByEmail(ctx context.Context, email string) (*models.UserCore, error)
@@ -22,9 +23,11 @@ type Storage struct {
 		Update_UserEmailByUid(ctx context.Context, userUid uint64, email string) error
 		Update_UserCoreByUid(ctx context.Context, tx *sql.Tx, user *models.UserProfileUpd) error
 		Update_UserProfileByUid(ctx context.Context, tx *sql.Tx, user *models.UserProfileUpd) error
+		Update_UserProfileAccessByUid(ctx context.Context, tx *sql.Tx, user *models.UserProfileUpd) error
 		Update_UserAvatarByUid(ctx context.Context, userUid uint64, avatar string) error
 
 		Delete_UserByUid(ctx context.Context, userUid uint64) error
+		Delete_UserIfEmailNotConfirmed(ctx context.Context) error
 	}
 	Messages interface { //nolint
 		Get_MessagesHistoryByReceiver(ctx context.Context, receiverUid, senderUid uint64) (*[]models.OnesMessage, error)
