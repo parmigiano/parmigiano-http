@@ -14,18 +14,10 @@ type MessageStore struct {
 	logger *logger.Logger
 }
 
-func (s *MessageStore) Get_MessagesHistoryByReceiver(ctx context.Context, myUserUid, otherUserUid uint64) (*[]models.OnesMessage, error) {
+func (s *MessageStore) Get_MessagesHistoryByChatId(ctx context.Context, chatId, myUserUid uint64) (*[]models.OnesMessage, error) {
 	messages := []models.OnesMessage{}
 
 	query := `
-		WITH chat AS (
-			SELECT chats.id as chat_id
-			FROM chats
-			JOIN chat_members AS cm1 ON cm1.chat_id = chats.id AND cm1.user_uid = $1
-			JOIN chat_members AS cm2 ON cm2.chat_id = chats.id AND cm2.user_uid = $2
-			WHERE chats.chat_type = 'private'
-			LIMIT 1
-		)
 		SELECT
 			messages.id,
 			messages.chat_id,
@@ -38,19 +30,19 @@ func (s *MessageStore) Get_MessagesHistoryByReceiver(ctx context.Context, myUser
 			message_statuses.read_at,
 			message_edits.new_content AS edit_content
 		FROM messages
-		JOIN chat ON messages.chat_id = chat.chat_id
 		LEFT JOIN message_statuses
 			ON message_statuses.message_id = messages.id
-			AND message_statuses.receiver_uid = $1
+			AND message_statuses.receiver_uid = $2
 		LEFT JOIN message_edits
 			ON message_edits.message_id = messages.id
+		WHERE messages.chat_id = $1
 		ORDER BY messages.created_at ASC;
 	`
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	rows, err := s.db.QueryContext(ctx, query, myUserUid, otherUserUid)
+	rows, err := s.db.QueryContext(ctx, query, chatId, myUserUid)
 	if err != nil {
 		if errors.Is(sql.ErrNoRows, err) {
 			return nil, nil
