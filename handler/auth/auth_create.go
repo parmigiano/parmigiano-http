@@ -3,9 +3,8 @@ package auth
 import (
 	"fmt"
 	"math/rand"
-	"parmigiano/http/config"
 	"parmigiano/http/infra/constants"
-	"parmigiano/http/infra/encryption"
+	"parmigiano/http/infra/store/redis"
 	"parmigiano/http/pkg"
 	"parmigiano/http/pkg/security"
 	"parmigiano/http/types"
@@ -157,19 +156,16 @@ func (h *Handler) AuthCreateUserHandler(w http.ResponseWriter, r *http.Request) 
 	// ------------------------------
 	// send link to email for confirm
 
-	ReqAuthToken := &types.ReqAuthToken{
-		UID:       UserCore.UserUid,
-		Timestamp: time.Now(),
+	session := &types.Session{
+		UserUid: UserCore.UserUid,
 	}
 
-	authTokenString, _ := config.JSON.Marshal(ReqAuthToken)
-
-	authTokenResp, err := encryption.Encrypt(string(authTokenString))
+	sessionId, err := redis.CreateSession(session)
 	if err != nil {
 		h.Logger.Error("%v", err)
-		return httperr.InternalServerError(err.Error())
+		return httperr.Db(ctx, err)
 	}
 
-	httpx.HttpResponse(w, r, http.StatusCreated, authTokenResp)
+	httpx.HttpResponse(w, r, http.StatusCreated, sessionId)
 	return nil
 }

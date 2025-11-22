@@ -88,7 +88,7 @@ func (s *ChatStore) Get_ChatsMyHistory(ctx context.Context, userUid uint64) (*[]
 	chats := []models.ChatMinimalWithLMessage{}
 
 	query := `
-		SELECT DISTINCT
+		SELECT
 			chats.id,
 			user_profiles.name,
 			user_profiles.username,
@@ -100,28 +100,26 @@ func (s *ChatStore) Get_ChatsMyHistory(ctx context.Context, userUid uint64) (*[]
 			last_message.content AS last_message,
 			last_message.created_at AS last_message_date,
 			COALESCE(unread_count.count, 0) AS unread_message_count
-		FROM messages
-		JOIN chats ON messages.chat_id = chats.id
-		JOIN chat_members cm1 ON cm1.chat_id = chats.id
-		JOIN chat_members cm2 ON cm2.chat_id = chats.id
-		JOIN user_cores ON (user_cores.user_uid = cm1.user_uid OR user_cores.user_uid = cm2.user_uid)
-		LEFT JOIN user_profiles ON user_cores.user_uid = user_profiles.user_uid
-		LEFT JOIN user_actives ON user_cores.user_uid = user_actives.user_uid
-		LEFT JOIN LATERAL (
+		FROM chats
+		JOIN chat_members AS cm_current ON cm_current.chat_id = chats.id AND cm_current.user_uid = $1
+		JOIN chat_members AS cm_other ON cm_other.chat_id = chats.id AND cm_other.user_uid != $1
+		JOIN user_cores ON user_cores.user_uid = cm_other.user_uid
+		LEFT JOIN user_profiles ON user_profiles.user_uid = user_cores.user_uid
+		LEFT JOIN user_actives ON user_actives.user_uid = user_cores.user_uid
+		JOIN LATERAL (
 			SELECT messages.content, messages.created_at
-			FROM messages AS m2
-			WHERE m2.chat_id = chats.id
-			ORDER BY m2.created_at DESC
+			FROM messages
+			WHERE messages.chat_id = chats.id
+			ORDER BY messages.created_at DESC
 			LIMIT 1
 		) AS last_message ON TRUE
 		LEFT JOIN LATERAL (
 			SELECT COUNT(*) AS count
-			FROM messages AS m3
-			LEFT JOIN message_statuses ms ON ms.message_id = m3.id AND ms.receiver_uid = $1
-			WHERE m3.chat_id = chats.id AND m3.sender_uid != $1 AND (ms.read_at IS NULL)
+			FROM messages
+			LEFT JOIN message_statuses ON message_statuses.message_id = messages.id AND message_statuses.receiver_uid = $1
+			WHERE messages.chat_id = chats.id AND messages.sender_uid != $1 AND (message_statuses.read_at IS NULL)
 		) AS unread_count ON TRUE
-		WHERE $1 IN (cm1.user_uid, cm2.user_uid) AND user_cores.user_uid != $1
-		ORDER BY last_message.created_at DESC
+		ORDER BY last_message.created_at DESC NULLS LAST
 	`
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)

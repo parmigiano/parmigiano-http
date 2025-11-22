@@ -2,14 +2,12 @@ package types
 
 import (
 	"parmigiano/http/infra/store/postgres/models"
-	"time"
 )
+
+type Session struct {
+	UserUid uint64 `json:"user_uid"`
+}
 
 type AuthToken struct {
 	User models.UserInfo `json:"user"`
-}
-
-type ReqAuthToken struct {
-	UID       uint64    `json:"uid"`
-	Timestamp time.Time `json:"timestamp"`
 }

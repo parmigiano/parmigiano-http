@@ -4,13 +4,11 @@ package middleware
 import (
 	"context"
 	"net/http"
-	"parmigiano/http/config"
 	"parmigiano/http/handler"
-	"parmigiano/http/infra/encryption"
+	"parmigiano/http/infra/store/redis"
 	"parmigiano/http/pkg/httpx"
 	"parmigiano/http/types"
 	"strings"
-	"time"
 
 	"github.com/gorilla/mux"
 )
@@ -19,31 +17,31 @@ import (
 func IsAuthenticatedMiddleware(h *handler.BaseHandler) mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			var token string
+			var sessionId string
 
 			// from header
 			authHeader := r.Header.Get("Authorization")
 			if authHeader != "" {
 				parts := strings.Split(authHeader, " ")
 				if len(parts) == 2 && strings.ToLower(parts[0]) == "bearer" {
-					token = parts[1]
+					sessionId = parts[1]
 				}
 			}
 
 			// from cookie
-			if token == "" {
+			if sessionId == "" {
 				cookie, err := r.Cookie("auth-token")
 				if err == nil && cookie != nil {
-					token = cookie.Value
+					sessionId = cookie.Value
 				}
 			}
 
-			if token == "" {
+			if sessionId == "" {
 				httpx.HttpResponse(w, r, http.StatusUnauthorized, "пожалуйста, подключитесь к учетной записи")
 				return
 			}
 
-			ReqAuthTokenDecrypted, err := encryption.Decrypt(token)
+			session, err := redis.GetSession(sessionId)
 			if err != nil {
 				h.Logger.Error("%v", err)
 
@@ -51,21 +49,13 @@ func IsAuthenticatedMiddleware(h *handler.BaseHandler) mux.MiddlewareFunc {
 				return
 			}
 
-			var ReqAuthToken types.ReqAuthToken
-			if err := config.JSON.Unmarshal([]byte(ReqAuthTokenDecrypted), &ReqAuthToken); err != nil {
-				h.Logger.Error("%v", err)
-
-				httpx.HttpResponse(w, r, http.StatusUnauthorized, "ошибка проверки токена, попробуйте позже")
-				return
-			}
-
-			if !time.Now().Before(ReqAuthToken.Timestamp.Add(7 * 24 * time.Hour)) {
+			if session == nil {
 				httpx.HttpResponse(w, r, http.StatusUnauthorized, "пожалуйста, подключитесь к учетной записи")
 				return
 			}
 
 			// db: get user core
-			user, err := h.Store.Users.Get_UserInfoByUserUid(r.Context(), ReqAuthToken.UID)
+			user, err := h.Store.Users.Get_UserInfoByUserUid(r.Context(), session.UserUid)
 			if err != nil {
 				h.Logger.Error("%v", err)
 
@@ -81,6 +71,9 @@ func IsAuthenticatedMiddleware(h *handler.BaseHandler) mux.MiddlewareFunc {
 			authTokenModel := &types.AuthToken{
 				User: *user,
 			}
+
+			// session REFRESH
+			redis.RefreshSession(sessionId)
 
 			//nolint
 			ctx := context.WithValue(r.Context(), "identity", authTokenModel)

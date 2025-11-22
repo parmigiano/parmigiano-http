@@ -1,16 +1,13 @@
 package auth
 
 import (
-	"parmigiano/http/config"
-	"parmigiano/http/infra/encryption"
+	"net/http"
+	"parmigiano/http/infra/store/redis"
+	"parmigiano/http/pkg/httpx"
+	"parmigiano/http/pkg/httpx/httperr"
 	"parmigiano/http/pkg/security"
 	"parmigiano/http/types"
 	"strings"
-	"time"
-
-	"net/http"
-	"parmigiano/http/pkg/httpx"
-	"parmigiano/http/pkg/httpx/httperr"
 
 	"github.com/go-playground/validator"
 )
@@ -56,19 +53,16 @@ func (h *Handler) AuthLoginUserHandler(w http.ResponseWriter, r *http.Request) e
 		return httperr.Conflict("электронная почта не подтверждена, письмо отправлено")
 	}
 
-	ReqAuthToken := &types.ReqAuthToken{
-		UID:       user.UserUid,
-		Timestamp: time.Now(),
+	session := &types.Session{
+		UserUid: user.UserUid,
 	}
 
-	authTokenString, _ := config.JSON.Marshal(ReqAuthToken)
-
-	authTokenResp, err := encryption.Encrypt(string(authTokenString))
+	sessionId, err := redis.CreateSession(session)
 	if err != nil {
 		h.Logger.Error("%v", err)
-		return httperr.InternalServerError(err.Error())
+		return httperr.Db(ctx, err)
 	}
 
-	httpx.HttpResponse(w, r, http.StatusOK, authTokenResp)
+	httpx.HttpResponse(w, r, http.StatusOK, sessionId)
 	return nil
 }

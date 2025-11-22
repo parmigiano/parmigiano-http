@@ -30,7 +30,7 @@ type Storage struct {
 		Delete_UserIfEmailNotConfirmed(ctx context.Context) error
 	}
 	Messages interface { //nolint
-		Get_MessagesHistoryByReceiver(ctx context.Context, receiverUid, senderUid uint64) (*[]models.OnesMessage, error)
+		Get_MessagesHistoryByChatId(ctx context.Context, chatId, myUserUid uint64) (*[]models.OnesMessage, error)
 	}
 	Chats interface { //nolint
 		Create_Chat(ctx context.Context, chat *models.Chat) (uint64, error)

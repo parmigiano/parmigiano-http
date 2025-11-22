@@ -33,7 +33,7 @@ func (h *Handler) ChatsGetHistoryHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	if chat != nil {
-		messages, err := h.Store.Messages.Get_MessagesHistoryByReceiver(ctx, authToken.User.UserUid, uint64(senderUid))
+		messages, err := h.Store.Messages.Get_MessagesHistoryByChatId(ctx, chat.ID, authToken.User.UserUid)
 		if err != nil {
 			h.Logger.Error("%v", err)
 			return httperr.Db(ctx, err)
