@@ -171,7 +171,7 @@ func (s *ChatStore) Get_ChatsBySearchUsername(ctx context.Context, myUserUid uin
 
 	query := `
 		SELECT
-			user_cores.id,
+			c.id,
 			user_profiles.name,
 			user_profiles.username,
 			user_profiles.avatar,
@@ -182,35 +182,39 @@ func (s *ChatStore) Get_ChatsBySearchUsername(ctx context.Context, myUserUid uin
 			last_message.content AS last_message,
 			last_message.created_at AS last_message_date,
 			COALESCE(unread_count.count, 0) AS unread_message_count
-		FROM user_cores
-		LEFT JOIN user_profiles ON user_cores.user_uid = user_profiles.user_uid
-		LEFT JOIN user_actives ON user_cores.user_uid = user_actives.user_uid
+		FROM chats c
+		JOIN chat_members cm1 ON cm1.chat_id = c.id
+		JOIN chat_members cm2 ON cm2.chat_id = c.id AND cm2.user_uid = $1
+		JOIN user_cores ON user_cores.user_uid = cm1.user_uid
+		LEFT JOIN user_profiles ON user_profiles.user_uid = user_cores.user_uid
+		LEFT JOIN user_actives ON user_actives.user_uid = user_cores.user_uid
 		LEFT JOIN LATERAL (
 			SELECT messages.content, messages.created_at
-			FROM chats
-			JOIN chat_members cm1 ON cm1.chat_id = chats.id AND cm1.user_uid = user_cores.user_uid
-			JOIN chat_members cm2 ON cm2.chat_id = chats.id AND cm2.user_uid = $1
-			JOIN messages ON messages.chat_id = chats.id
-			WHERE chats.chat_type = 'private'
+			FROM chats c2
+			JOIN chat_members cm1 ON cm1.chat_id = c2.id AND cm1.user_uid = user_cores.user_uid
+			JOIN chat_members cm2 ON cm2.chat_id = c2.id AND cm2.user_uid = $1
+			JOIN messages ON messages.chat_id = c2.id
+			WHERE c2.chat_type = 'private' AND c2.id = c.id
 			ORDER BY messages.created_at DESC
-    		LIMIT 1
+			LIMIT 1
 		) AS last_message ON TRUE
 		LEFT JOIN LATERAL (
 			SELECT COUNT(*) AS count
-			FROM chats
-			JOIN chat_members cm1 ON cm1.chat_id = chats.id AND cm1.user_uid = user_cores.user_uid
-			JOIN chat_members cm2 ON cm2.chat_id = chats.id AND cm2.user_uid = $1
-			JOIN messages ON messages.chat_id = chats.id
+			FROM chats c3
+			JOIN chat_members cm1 ON cm1.chat_id = c3.id AND cm1.user_uid = user_cores.user_uid
+			JOIN chat_members cm2 ON cm2.chat_id = c3.id AND cm2.user_uid = $1
+			JOIN messages ON messages.chat_id = c3.id
 			LEFT JOIN message_statuses
-				ON message_statuses.message_id = messages.id AND message_statuses.receiver_uid = $1
-			WHERE chats.chat_type = 'private'
-				AND messages.sender_uid = user_cores.user_uid
-      			AND (message_statuses.read_at IS NULL)
+				ON message_statuses.message_id = messages.id
+				AND message_statuses.receiver_uid = $1
+			WHERE c3.chat_type = 'private'
+			  AND c3.id = c.id
+			  AND messages.sender_uid = user_cores.user_uid
+			  AND (message_statuses.read_at IS NULL)
 		) AS unread_count ON TRUE
-		WHERE user_cores.user_uid != $1 AND (
-			similarity(user_profiles.username, $2) > 0.6
-		)
-		ORDER BY similarity(user_profiles.username, $2) DESC, user_profiles.username ASC
+		WHERE user_cores.user_uid != $1
+		  AND similarity(user_profiles.username, $2) > 0.6
+		ORDER BY similarity(user_profiles.username, $2) DESC, user_profiles.username ASC;
 	`
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
