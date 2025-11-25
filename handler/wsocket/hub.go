@@ -23,11 +23,13 @@ func (h *Hub) AddClient(c *Client) {
 	h.clients[c] = true
 	h.mu.Unlock()
 
-	fmt.Printf("[INFO] Client connected by wsocket: %s\n", c.Conn.RemoteAddr().String())
+	fmt.Printf("[INFO] Client connected by wsocket: %s | uid -> %d\n", c.Conn.RemoteAddr().String(), c.UserUid)
 }
 
 func (h *Hub) RemoveClient(c *Client) {
 	h.mu.Lock()
+	fmt.Printf("[INFO] Client disconnected | uid -> %d\n", c.UserUid)
+
 	delete(h.clients, c)
 	h.mu.Unlock()
 }
@@ -41,6 +43,17 @@ func (h *Hub) Broadcast(message interface{}) {
 		if err != nil {
 			c.Conn.Close()
 			delete(h.clients, c)
+		}
+	}
+}
+
+func (h *Hub) SendToUser(userUid uint64, message any) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+
+	for c := range h.clients {
+		if c.UserUid == userUid {
+			c.Conn.WriteJSON(message)
 		}
 	}
 }
