@@ -49,7 +49,8 @@ func (s *httpServer) routes() http.Handler {
 	router.PathPrefix("/api/").Handler(s.cors(apirouter))
 
 	// websocket connection client (pkg. wsocket)
-	router.HandleFunc("/wsocket", wsocket.HandleWebSocket)
+	ws := wsocket.NewWSHandler(s.db, s.logger, s.store)
+	router.HandleFunc("/wsocket", ws.HandleWebSocket)
 
 	return router
 }

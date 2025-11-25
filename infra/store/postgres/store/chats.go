@@ -14,7 +14,7 @@ type ChatStore struct {
 	logger *logger.Logger
 }
 
-func (s *ChatStore) Create_Chat(ctx context.Context, chat *models.Chat) (uint64, error) {
+func (s *ChatStore) Create_Chat(tx *sql.Tx, ctx context.Context, chat *models.Chat) (uint64, error) {
 	var chatId uint64
 
 	query := `
@@ -24,7 +24,7 @@ func (s *ChatStore) Create_Chat(ctx context.Context, chat *models.Chat) (uint64,
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	err := s.db.QueryRowContext(ctx, query, chat.ChatType, chat.Title).Scan(&chatId)
+	err := tx.QueryRowContext(ctx, query, chat.ChatType, chat.Title).Scan(&chatId)
 	if err != nil {
 		return 0, err
 	}
@@ -32,7 +32,7 @@ func (s *ChatStore) Create_Chat(ctx context.Context, chat *models.Chat) (uint64,
 	return chatId, nil
 }
 
-func (s *ChatStore) Create_ChatMember(ctx context.Context, member *models.ChatMember) error {
+func (s *ChatStore) Create_ChatMember(tx *sql.Tx, ctx context.Context, member *models.ChatMember) error {
 	query := `
 		INSERT INTO chat_members (chat_id, user_uid, role) VALUES ($1, $2, $3)
 	`
@@ -40,7 +40,7 @@ func (s *ChatStore) Create_ChatMember(ctx context.Context, member *models.ChatMe
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	_, err := s.db.ExecContext(ctx, query, member.ChatID, member.UserUid, member.Role)
+	_, err := tx.ExecContext(ctx, query, member.ChatID, member.UserUid, member.Role)
 	if err != nil {
 		return err
 	}
@@ -48,7 +48,7 @@ func (s *ChatStore) Create_ChatMember(ctx context.Context, member *models.ChatMe
 	return nil
 }
 
-func (s *ChatStore) Create_ChatSetting(ctx context.Context, setting *models.ChatSetting) error {
+func (s *ChatStore) Create_ChatSetting(tx *sql.Tx, ctx context.Context, setting *models.ChatSetting) error {
 	query := `
 		INSERT INTO chat_settings (chat_id) VALUES ($1)
 	`
@@ -56,7 +56,7 @@ func (s *ChatStore) Create_ChatSetting(ctx context.Context, setting *models.Chat
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	_, err := s.db.ExecContext(ctx, query, setting.ChatID)
+	_, err := tx.ExecContext(ctx, query, setting.ChatID)
 	if err != nil {
 		return err
 	}
@@ -194,7 +194,7 @@ func (s *ChatStore) Get_ChatsBySearchUsername(ctx context.Context, myUserUid uin
 			user_cores.email,
 			user_actives.online,
 			user_actives.updated_at as last_online_date,
-			chats.id AS chat_id,
+			COALESCE(chats.id, 0) AS chat_id,
 			last_message.content AS last_message,
 			last_message.created_at AS last_message_date,
 			COALESCE(unread_count.count, 0) AS unread_message_count
@@ -301,7 +301,14 @@ func (s *ChatStore) Get_ChatSettingByChatId(ctx context.Context, chatId uint64) 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	if err := s.db.QueryRowContext(ctx, query, chatId).Scan(chatSetting); err != nil {
+	if err := s.db.QueryRowContext(ctx, query, chatId).Scan(
+		&chatSetting.ID,
+		&chatSetting.CreatedAt,
+		&chatSetting.UpdatedAt,
+		&chatSetting.ChatID,
+		&chatSetting.CustomBackground,
+		&chatSetting.Blocked,
+	); err != nil {
 		if errors.Is(sql.ErrNoRows, err) {
 			return nil, nil
 		}
@@ -310,6 +317,46 @@ func (s *ChatStore) Get_ChatSettingByChatId(ctx context.Context, chatId uint64) 
 	}
 
 	return &chatSetting, nil
+}
+
+func (s *ChatStore) Get_ChatMembers(ctx context.Context, chatId, myUserUid uint64) (*[]uint64, error) {
+	var members []uint64
+
+	query := `
+		SELECT user_uid FROM chat_members 
+		WHERE chat_id = $1 AND user_uid != $2
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	rows, err := s.db.QueryContext(ctx, query, chatId, myUserUid)
+	if err != nil {
+		if errors.Is(sql.ErrNoRows, err) {
+			return nil, nil
+		}
+
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var member uint64
+
+		err := rows.Scan(&member)
+
+		if err != nil {
+			return nil, err
+		}
+
+		members = append(members, member)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return &members, nil
 }
 
 func (s *ChatStore) Update_ChatSettingsBlocked(ctx context.Context, blocked bool, chatId uint64) error {

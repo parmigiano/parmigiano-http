@@ -31,5 +31,5 @@ func (h *Handler) RegisterRoutes(router *mux.Router) {
 	// access: все
 	chateRouter.Handle("/{chatId:[0-9]+}/cbackground", middleware.RequireEmailConfirmed(
 		httpx.ErrorHandler(h.ChatsUpdateCustomBackgroundHandler),
-	)).Methods(http.MethodPatch)
+	)).Methods(http.MethodPost)
 }

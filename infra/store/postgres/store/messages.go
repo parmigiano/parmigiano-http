@@ -14,6 +14,42 @@ type MessageStore struct {
 	logger *logger.Logger
 }
 
+func (s *MessageStore) Create_Message(tx *sql.Tx, ctx context.Context, message *models.Message) (uint64, error) {
+	var messageId uint64
+
+	query := `
+		INSERT INTO messages (chat_id, sender_uid, content, content_type) VALUES ($1, $2, $3, $4) RETURNING id
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	// message
+	if err := tx.QueryRowContext(ctx, query, message.ChatID, message.SenderUid, message.Content, message.ContentType).Scan(&messageId); err != nil {
+		return 0, err
+	}
+
+	return messageId, nil
+}
+
+func (s *MessageStore) Create_MessageStatus(tx *sql.Tx, ctx context.Context, messageId, receiverUid uint64) (*time.Time, error) {
+	var deliveredAt time.Time
+
+	query := `
+		INSERT INTO message_statuses (message_id, receiver_uid) VALUES ($1, $2) RETURNING delivered_at
+	`
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	// message status
+	if err := tx.QueryRowContext(ctx, query, messageId, receiverUid).Scan(&deliveredAt); err != nil {
+		return nil, err
+	}
+
+	return &deliveredAt, nil
+}
+
 func (s *MessageStore) Get_MessagesHistoryByChatId(ctx context.Context, chatId, myUserUid uint64) (*[]models.OnesMessage, error) {
 	messages := []models.OnesMessage{}
 

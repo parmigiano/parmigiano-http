@@ -21,7 +21,7 @@ func (s *httpServer) httpStart() error {
 	routes := s.routes()
 
 	fmt.Printf("\n[%v] [INFO] Http server started %s:%d\n", time.Now().Format("2006-01-02 15:04:05"), config.ServerAddr, port)
-	fmt.Printf("[%v] [INFO] Proccess PID: %d, Version: beta\n", time.Now().Format("2006-01-02 15:04:05"), os.Getpid())
+	fmt.Printf("[%v] [INFO] Proccess PID: %d, Version: alpha\n", time.Now().Format("2006-01-02 15:04:05"), os.Getpid())
 	fmt.Printf("[%v] [INFO] Golang version: %s\n\n", time.Now().Format("2006-01-02 15:04:05"), runtime.Version())
 
 	httpServe := &http.Server{

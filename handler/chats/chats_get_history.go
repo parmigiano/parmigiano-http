@@ -43,7 +43,16 @@ func (h *Handler) ChatsGetHistoryHandler(w http.ResponseWriter, r *http.Request)
 		return nil
 	}
 
-	chatId, err := h.Store.Chats.Create_Chat(ctx, &models.Chat{
+	tx, err := h.Db.BeginTx(ctx, nil)
+	if err != nil {
+		h.Logger.Error("%v", err)
+		return httperr.Db(ctx, err)
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	chatId, err := h.Store.Chats.Create_Chat(tx, ctx, &models.Chat{
 		ChatType: "private",
 		Title:    nil,
 	})
@@ -58,10 +67,20 @@ func (h *Handler) ChatsGetHistoryHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	for _, member := range members {
-		if err := h.Store.Chats.Create_ChatMember(ctx, &member); err != nil {
+		if err := h.Store.Chats.Create_ChatMember(tx, ctx, &member); err != nil {
 			h.Logger.Error("%v", err)
 			return httperr.Db(ctx, err)
 		}
+	}
+
+	if err := h.Store.Chats.Create_ChatSetting(tx, ctx, &models.ChatSetting{ChatID: chatId}); err != nil {
+		h.Logger.Error("%v", err)
+		return httperr.Db(ctx, err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		h.Logger.Error("%v", err)
+		return httperr.Db(ctx, err)
 	}
 
 	httpx.HttpResponse(w, r, http.StatusOK, []models.Message{})
