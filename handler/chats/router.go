@@ -19,4 +19,17 @@ func (h *Handler) RegisterRoutes(router *mux.Router) {
 	chateRouter.Handle("/history/{senderUid:[0-9]+}", middleware.RequireEmailConfirmed(
 		httpx.ErrorHandler(h.ChatsGetHistoryHandler),
 	)).Methods(http.MethodGet)
+
+	// access: все
+	chateRouter.Handle("/{chatId:[0-9]+}/settings", httpx.ErrorHandler(h.GetChatSettingsHandler)).Methods(http.MethodGet)
+
+	// access: все
+	chateRouter.Handle("/{chatId:[0-9]+}/blocked", middleware.RequireEmailConfirmed(
+		httpx.ErrorHandler(h.ChatsUpdateBlockedHandler),
+	)).Methods(http.MethodPatch)
+
+	// access: все
+	chateRouter.Handle("/{chatId:[0-9]+}/cbackground", middleware.RequireEmailConfirmed(
+		httpx.ErrorHandler(h.ChatsUpdateCustomBackgroundHandler),
+	)).Methods(http.MethodPatch)
 }

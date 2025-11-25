@@ -18,6 +18,15 @@ type ChatMember struct {
 	Role      string    `json:"role" db:"role"` // "owner", "admin", "member"
 }
 
+type ChatSetting struct {
+	ID               uint64    `json:"id" db:"id"`
+	CreatedAt        time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt        time.Time `json:"updated_at" db:"updated_at"`
+	ChatID           uint64    `json:"chat_id" db:"chat_id"`
+	CustomBackground *string   `json:"custom_background" db:"custom_background"`
+	Blocked          bool      `json:"blocked" db:"blocked"`
+}
+
 type ChatMinimalWithLMessage struct {
 	ID                 uint64     `json:"id" db:"id"`
 	Name               string     `json:"name" db:"name"`

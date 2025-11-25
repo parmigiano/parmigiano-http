@@ -35,10 +35,16 @@ type Storage struct {
 	Chats interface { //nolint
 		Create_Chat(ctx context.Context, chat *models.Chat) (uint64, error)
 		Create_ChatMember(ctx context.Context, member *models.ChatMember) error
+		Create_ChatSetting(ctx context.Context, setting *models.ChatSetting) error
 
 		Get_ChatPrivateByUser(ctx context.Context, myUserUid, otherUserUid uint64) (*models.Chat, error)
 		Get_ChatsMyHistory(ctx context.Context, userUid uint64) (*[]models.ChatMinimalWithLMessage, error)
 		Get_ChatsBySearchUsername(ctx context.Context, myUserUid uint64, username string) (*[]models.ChatMinimalWithLMessage, error)
+		Get_IsUserChatMember(ctx context.Context, chatId, userUid uint64) (bool, error)
+		Get_ChatSettingByChatId(ctx context.Context, chatId uint64) (*models.ChatSetting, error)
+
+		Update_ChatSettingsBlocked(ctx context.Context, blocked bool, chatId uint64) error
+		Update_ChatSettingCustomBackground(ctx context.Context, background string, chatId uint64) error
 	}
 }
 
