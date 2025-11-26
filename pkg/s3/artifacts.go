@@ -11,8 +11,8 @@ import (
 	"github.com/minio/minio-go/v7"
 )
 
-func UploadImageFile(userUid uint64, filePath string, contentType string) (string, error) {
-	objectName := fmt.Sprintf("%d/%s%s", userUid, uuid.New().String(), filepath.Ext(filePath))
+func UploadImageFile(key any, filePath string, contentType string) (string, error) {
+	objectName := fmt.Sprintf("%v/%s%s", key, uuid.New().String(), filepath.Ext(filePath))
 
 	_, err := Client.FPutObject(context.Background(), BucketName, objectName, filePath, minio.PutObjectOptions{
 		ContentType: contentType,

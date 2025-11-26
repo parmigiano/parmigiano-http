@@ -1,6 +1,7 @@
 package users
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"os"
@@ -23,6 +24,14 @@ func (h *Handler) UserUpdateAvatarHandler(w http.ResponseWriter, r *http.Request
 	}
 	defer file.Close()
 
+	// check prepare file
+	switch handler.Header.Get("Content-Type") {
+	case "image/png", "image/jpeg", "image/gif":
+		// continue
+	default:
+		return httperr.BadRequest("только PNG, JPG или GIF разрешены")
+	}
+
 	tempPath := filepath.Join(os.TempDir(), handler.Filename)
 
 	tempFile, err := os.Create(tempPath)
@@ -40,7 +49,7 @@ func (h *Handler) UserUpdateAvatarHandler(w http.ResponseWriter, r *http.Request
 		return httperr.InternalServerError("ошибка записи файла")
 	}
 
-	url, err := s3.UploadImageFile(authToken.User.UserUid, tempPath, handler.Header.Get("Content-Type"))
+	url, err := s3.UploadImageFile(fmt.Sprintf("avatar_user_uid_%d", authToken.User.UserUid), tempPath, handler.Header.Get("Content-Type"))
 	if err != nil {
 		h.Logger.Error("%v", err)
 		return httperr.InternalServerError("ошибка загрузки файла")

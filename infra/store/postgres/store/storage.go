@@ -49,7 +49,7 @@ type Storage struct {
 		Get_ChatMembers(ctx context.Context, chatId, myUserUid uint64) (*[]uint64, error)
 
 		Update_ChatSettingsBlocked(ctx context.Context, blocked bool, chatId uint64) error
-		Update_ChatSettingCustomBackground(ctx context.Context, background string, chatId uint64) error
+		Update_ChatSettingCustomBackground(ctx context.Context, background *string, chatId uint64) error
 	}
 }
 

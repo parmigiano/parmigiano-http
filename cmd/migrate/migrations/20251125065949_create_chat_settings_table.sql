@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS chat_settings (
     chat_id BIGINT REFERENCES chats(id) ON DELETE CASCADE,
     custom_background VARCHAR(255),
     blocked BOOLEAN NOT NULL DEFAULT FALSE,
-    who_blocked_uid BIGINT NOT NULL
+    who_blocked_uid BIGINT NOT NULL DEFAULT 0
 );
 
 CREATE OR REPLACE FUNCTION set_updated_at_chat_settings()
