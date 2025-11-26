@@ -111,6 +111,7 @@ func (s *ChatStore) Get_ChatsMyHistory(ctx context.Context, userUid uint64) (*[]
 			user_profiles.avatar,
 			user_cores.user_uid,
 			user_cores.email,
+			user_profile_accesses.email_visible,
 			user_actives.online,
 			user_actives.updated_at as last_online_date,
 			last_message.content AS last_message,
@@ -122,6 +123,7 @@ func (s *ChatStore) Get_ChatsMyHistory(ctx context.Context, userUid uint64) (*[]
 		JOIN user_cores ON user_cores.user_uid = cm_other.user_uid
 		LEFT JOIN user_profiles ON user_profiles.user_uid = user_cores.user_uid
 		LEFT JOIN user_actives ON user_actives.user_uid = user_cores.user_uid
+		LEFT JOIN user_profile_accesses ON user_profile_accesses.user_uid = user_cores.user_uid
 		JOIN LATERAL (
 			SELECT messages.content, messages.created_at
 			FROM messages
@@ -161,6 +163,7 @@ func (s *ChatStore) Get_ChatsMyHistory(ctx context.Context, userUid uint64) (*[]
 			&chat.Avatar,
 			&chat.UserUid,
 			&chat.Email,
+			&chat.EmailVisible,
 			&chat.Online,
 			&chat.LastOnlineDate,
 			&chat.LastMessage,
@@ -308,6 +311,7 @@ func (s *ChatStore) Get_ChatSettingByChatId(ctx context.Context, chatId uint64) 
 		&chatSetting.ChatID,
 		&chatSetting.CustomBackground,
 		&chatSetting.Blocked,
+		&chatSetting.WhoBlockedUid,
 	); err != nil {
 		if errors.Is(sql.ErrNoRows, err) {
 			return nil, nil
