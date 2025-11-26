@@ -22,12 +22,12 @@ func (h *Handler) ChatsUpdateCustomBackgroundHandler(w http.ResponseWriter, r *h
 
 	chatIdParam := mux.Vars(r)["chatId"]
 	if chatIdParam == "" {
-		return httperr.BadRequest("неверный chat_uid")
+		return httperr.BadRequest("неверный chat_id")
 	}
 
 	chatId, err := strconv.Atoi(chatIdParam)
 	if err != nil {
-		return httperr.BadRequest("неверный chat_uid")
+		return httperr.BadRequest("неверный chat_id")
 	}
 
 	ok, err := h.Store.Chats.Get_IsUserChatMember(ctx, uint64(chatId), authToken.User.UserUid)
@@ -84,8 +84,10 @@ func (h *Handler) ChatsUpdateCustomBackgroundHandler(w http.ResponseWriter, r *h
 		}
 	}(chatSetting.CustomBackground)
 
+	// send event 'chat_background_updated' for all users
 	go func(chatIdP uint64, urlp string) {
-		wsocket.GetHub().Broadcast(map[string]any{
+		hub := wsocket.GetHub()
+		hub.Broadcast(map[string]any{
 			"event": constants.EVENT_CHAT_BACKGROUND_UPDATED,
 			"data": map[string]any{
 				"chat_uid": chatIdP,
