@@ -3,7 +3,6 @@ package wsocket
 import (
 	"database/sql"
 	"net/http"
-	"parmigiano/http/infra/constants"
 	"parmigiano/http/infra/logger"
 	"parmigiano/http/infra/store/postgres/store"
 	"strconv"
@@ -46,36 +45,10 @@ func (h *WSHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
 		conn.Close()
 	}()
 
-	// online
-	hub.Broadcast(map[string]any{
-		"event": constants.EVENT_USER_ONLINE,
-		"data": map[string]any{
-			"user_uid": uid,
-			"online":   true,
-		},
-	})
-
-	// offline
-	defer func() {
-		hub.RemoveClient(client)
-		conn.Close()
-
-		hub.Broadcast(map[string]any{
-			"event": constants.EVENT_USER_ONLINE,
-			"data": map[string]any{
-				"user_uid": uid,
-				"online":   false,
-			},
-		})
-	}()
-
 	for {
 		var msg map[string]interface{}
 		if err := conn.ReadJSON(&msg); err != nil {
 			break
 		}
-
-		// processing req.
-		h.handleIncomingRequest(client, msg)
 	}
 }

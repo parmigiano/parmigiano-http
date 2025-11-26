@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"parmigiano/http/handler/wsocket"
 	"parmigiano/http/infra/constants"
+	"parmigiano/http/infra/store/redis"
 	"parmigiano/http/pkg/httpx"
 	"parmigiano/http/pkg/httpx/httperr"
 	"parmigiano/http/types"
@@ -44,6 +45,13 @@ func (h *Handler) ChatsUpdateBlockedHandler(w http.ResponseWriter, r *http.Reque
 		h.Logger.Error("%v", err)
 		return httperr.Db(ctx, err)
 	}
+
+	// delete cache
+	go func(chatIdP uint64) {
+		if err := redis.DeleteChatSettingCache(chatIdP); err != nil {
+			h.Logger.Error("%v", err)
+		}
+	}(payload.ChatId)
 
 	// send event 'chat_blocked' for all users
 	go func(chatIdP uint64, blockedp bool) {

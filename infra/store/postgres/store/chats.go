@@ -379,7 +379,7 @@ func (s *ChatStore) Update_ChatSettingsBlocked(ctx context.Context, blocked bool
 	return nil
 }
 
-func (s *ChatStore) Update_ChatSettingCustomBackground(ctx context.Context, background string, chatId uint64) error {
+func (s *ChatStore) Update_ChatSettingCustomBackground(ctx context.Context, background *string, chatId uint64) error {
 	query := `
 		UPDATE chat_settings SET custom_background = $1 WHERE chat_id = $2
 	`
