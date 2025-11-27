@@ -11,6 +11,14 @@ import (
 	"github.com/gorilla/mux"
 )
 
+func reverseMessages(msgs *[]models.OnesMessage) {
+	s := *msgs
+
+	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+		s[i], s[j] = s[j], s[i]
+	}
+}
+
 var limit int = 30
 
 func (h *Handler) ChatsGetPrivateHistoryHandler(w http.ResponseWriter, r *http.Request) error {
@@ -51,6 +59,10 @@ func (h *Handler) ChatsGetPrivateHistoryHandler(w http.ResponseWriter, r *http.R
 		if err != nil {
 			h.Logger.Error("%v", err)
 			return httperr.Db(ctx, err)
+		}
+
+		if messages != nil {
+			reverseMessages(messages)
 		}
 
 		httpx.HttpResponseWithETag(w, r, http.StatusOK, messages)
