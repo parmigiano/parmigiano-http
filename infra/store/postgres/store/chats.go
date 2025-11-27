@@ -64,7 +64,43 @@ func (s *ChatStore) Create_ChatSetting(tx *sql.Tx, ctx context.Context, setting 
 	return nil
 }
 
-func (s *ChatStore) Get_ChatPrivateByUser(ctx context.Context, myUserUid, otherUserUid uint64) (*models.Chat, error) {
+func (s *ChatStore) Get_ChatGroupOrChannel(ctx context.Context, chatId uint64) (*models.Chat, error) {
+	_ = `
+		SELECT
+			chats.id AS chat_id,
+			chats.chat_type,
+			chats.title,
+			ARRAY_AGG(
+				JSON_BUILD_OBJECT(
+					'user_uid', user_cores.user_uid,
+					'name', user_profiles.name,
+					'username', user_profiles.username,
+					'avatar', user_profiles.avatar,
+					'online', COALESCE(user_actives.online, FALSE)
+				)
+			) AS members,
+		    messages.content AS last_message,
+		    messages.created_at AS last_message_at
+		FROM chats
+		JOIN chat_members ON chat_members.chat_id = chats.id
+		JOIN user_cores ON user_cores.user_uid = chat_members.user_uid
+		JOIN user_profiles ON user_profiles.user_uid = user_cores.user_uid
+		LEFT JOIN user_actives ON user_actives.user_uid = user_cores.user_uid
+		LEFT JOIN LATERAL (
+			SELECT m.content, m.created_at
+			FROM messages m
+			WHERE m.chat_id = chats.id
+			ORDER BY m.created_at DESC
+			LIMIT 1
+		) messages ON TRUE
+		WHERE chats.id = $1 AND chats.chat_type IN ('group', 'channel')
+		GROUP BY chats.id, chats.chat_type, chats.title, messages.content, messages.created_at
+	`
+
+	return nil, nil
+}
+
+func (s *ChatStore) Get_ChatPrivate(ctx context.Context, myUserUid, otherUserUid uint64) (*models.Chat, error) {
 	chat := models.Chat{}
 
 	query := `
@@ -74,6 +110,7 @@ func (s *ChatStore) Get_ChatPrivateByUser(ctx context.Context, myUserUid, otherU
 		JOIN chat_members AS cm1 ON cm1.chat_id = chats.id AND cm1.user_uid = $1
 		JOIN chat_members AS cm2 ON cm2.chat_id = chats.id AND cm2.user_uid = $2
 		WHERE chats.chat_type = 'private'
+		LIMIT 1
 	`
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
