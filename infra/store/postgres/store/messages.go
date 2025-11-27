@@ -37,13 +37,12 @@ func (s *MessageStore) Get_MessagesHistoryByChatId(ctx context.Context, chatId, 
 			ON message_edits.message_id = messages.id
 		WHERE messages.chat_id = $1
 		ORDER BY messages.created_at DESC
-		LIMIT $3 OFFSET $4
-	`
+	` // LIMIT $3 OFFSET $4
 
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	rows, err := s.db.QueryContext(ctx, query, chatId, myUserUid, limit, offset)
+	rows, err := s.db.QueryContext(ctx, query, chatId, myUserUid)
 	if err != nil {
 		if errors.Is(sql.ErrNoRows, err) {
 			return nil, nil
