@@ -36,7 +36,7 @@ func (s *MessageStore) Get_MessagesHistoryByChatId(ctx context.Context, chatId, 
 		LEFT JOIN message_edits
 			ON message_edits.message_id = messages.id
 		WHERE messages.chat_id = $1
-		ORDER BY messages.created_at ASC
+		ORDER BY messages.created_at DESC
 		LIMIT $3 OFFSET $4
 	`
 

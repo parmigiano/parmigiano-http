@@ -60,6 +60,10 @@ func (h *Handler) ChatsGetChannelHistoryHandler(w http.ResponseWriter, r *http.R
 		return httperr.Db(ctx, err)
 	}
 
+	if messages != nil {
+		reverseMessages(messages)
+	}
+
 	httpx.HttpResponseWithETag(w, r, http.StatusOK, messages)
 	return nil
 }
