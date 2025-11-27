@@ -11,29 +11,43 @@ import (
 	"github.com/gorilla/mux"
 )
 
-func (h *Handler) ChatsGetHistoryHandler(w http.ResponseWriter, r *http.Request) error {
+var limit int = 30
+
+func (h *Handler) ChatsGetPrivateHistoryHandler(w http.ResponseWriter, r *http.Request) error {
 	ctx := r.Context()
 	authToken := ctx.Value("identity").(*types.AuthToken)
 
-	senderUidParam := mux.Vars(r)["senderUid"]
-	if senderUidParam == "" {
+	searchParams := r.URL.Query()
+	offsetParam := searchParams.Get("offset")
+
+	if offsetParam == "" {
+		offsetParam = "0"
+	}
+
+	offset, err := strconv.Atoi(offsetParam)
+	if err != nil {
+		return httperr.InternalServerError("invalid offset")
+	}
+
+	companionUidParam := mux.Vars(r)["companionUid"]
+	if companionUidParam == "" {
 		return httperr.BadRequest("отсутствует идентификатор отправителя")
 	}
 
-	senderUid, err := strconv.Atoi(senderUidParam)
+	companionUid, err := strconv.Atoi(companionUidParam)
 	if err != nil {
 		h.Logger.Error("%v", err)
 		return httperr.InternalServerError("ошибка конфертации идентификатора отправителя")
 	}
 
-	chat, err := h.Store.Chats.Get_ChatPrivateByUser(ctx, authToken.User.UserUid, uint64(senderUid))
+	chat, err := h.Store.Chats.Get_ChatPrivate(ctx, authToken.User.UserUid, uint64(companionUid))
 	if err != nil {
 		h.Logger.Error("%v", err)
 		return httperr.Db(ctx, err)
 	}
 
 	if chat != nil {
-		messages, err := h.Store.Messages.Get_MessagesHistoryByChatId(ctx, chat.ID, authToken.User.UserUid)
+		messages, err := h.Store.Messages.Get_MessagesHistoryByChatId(ctx, chat.ID, authToken.User.UserUid, limit, offset)
 		if err != nil {
 			h.Logger.Error("%v", err)
 			return httperr.Db(ctx, err)
@@ -63,7 +77,7 @@ func (h *Handler) ChatsGetHistoryHandler(w http.ResponseWriter, r *http.Request)
 
 	members := []models.ChatMember{
 		{ChatID: chatId, UserUid: authToken.User.UserUid, Role: "member"},
-		{ChatID: chatId, UserUid: uint64(senderUid), Role: "member"},
+		{ChatID: chatId, UserUid: uint64(companionUid), Role: "member"},
 	}
 
 	for _, member := range members {
