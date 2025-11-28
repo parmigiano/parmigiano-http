@@ -22,10 +22,18 @@ CREATE TRIGGER set_updated_at_chat_settings_trigger
     BEFORE UPDATE ON chat_settings
     FOR EACH ROW
     EXECUTE FUNCTION set_updated_at_chat_settings();
+
+-- +INDEXES
+CREATE INDEX IF NOT EXISTS idx_chat_settings_chat_id ON chat_settings(chat_id);
+-- +INDEXES
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
+-- -INDEXES
+DROP INDEX IF EXISTS idx_chat_settings_chat_id;
+-- -INDEXES
+
 DROP TRIGGER IF EXISTS set_updated_at_chat_settings_trigger ON chat_settings;
 DROP FUNCTION IF EXISTS set_updated_at_chat_settings();
 DROP TABLE IF EXISTS chat_settings;

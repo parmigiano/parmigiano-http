@@ -31,10 +31,20 @@ CREATE TRIGGER set_updated_at_messages_trigger
     BEFORE UPDATE ON messages
     FOR EACH ROW
     EXECUTE FUNCTION set_updated_at_messages();
+
+-- +INDEXES
+CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
+CREATE INDEX IF NOT EXISTS idx_messages_chat_id_id ON messages(chat_id, id DESC);
+-- +INDEXES
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
+-- -INDEXES
+DROP INDEX IF EXISTS idx_messages_chat_id;
+DROP INDEX IF EXISTS idx_messages_chat_id_id;
+-- -INDEXES
+
 DROP TRIGGER IF EXISTS set_updated_at_messages_trigger ON messages;
 DROP FUNCTION IF EXISTS set_updated_at_messages();
 DROP TABLE IF EXISTS messages;
