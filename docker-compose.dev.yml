@@ -1,18 +1,18 @@
 version: "3.9"
 
 services:
-  ollama_phi:
-    image: ollama/ollama
-    container_name: ollama_phi
-    ports:
-      - '11435:11434'
-    environment:
-      - OLLAMA_NUM_PARALLEL=2
-      - OLLAMA_MAX_LOADED_MODELS=1
-      - OLLAMA_KEEP_ALIVE=10m
-    volumes:
-      - ollama_phi_data:/root/.ollama
-    restart: unless-stopped
+  # ollama_phi:
+  #   image: ollama/ollama
+  #   container_name: ollama_phi
+  #   ports:
+  #     - '11435:11434'
+  #   environment:
+  #     - OLLAMA_NUM_PARALLEL=2
+  #     - OLLAMA_MAX_LOADED_MODELS=1
+  #     - OLLAMA_KEEP_ALIVE=10m
+  #   volumes:
+  #     - ollama_phi_data:/root/.ollama
+  #   restart: unless-stopped
   # db:
   #   image: postgres
   #   environment:
@@ -23,6 +23,7 @@ services:
   #     test: ["CMD-SHELL", "pg_isready -U postgres"]
   #     interval: 5s
   #     retries: 5
+
   redis:
     image: redis:8
     command: redis-server --requirepass redispass --appendonly yes --appendfsync everysec
@@ -57,10 +58,9 @@ services:
     depends_on:
       # - db
       - redis
-      - ollama_phi
       - libretranslate
 
 volumes:
-  ollama_phi_data:
+  # ollama_phi_data:
   lt_data:
   redis_data:

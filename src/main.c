@@ -3,6 +3,7 @@
 
 #include <time.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <curl/curl.h>
 #include <libchttpx/libchttpx.h>
 
@@ -17,10 +18,10 @@ int main()
     env_init(".env.docker"); /* .env.production */
 
     const char* i18n_locate = getenv("I18N_LOCATE");
-    if (!i18n_locate)
+    if (!i18n_locate || i18n_locate[0] == '\0')
     {
-        fprintf(stderr, "i18n locate not found\n");
-        return 0;
+        fprintf(stderr, "I18N_LOCATE is missing or empty (expected ./src/infra/locale)\n");
+        return 1;
     }
 
     /* Locale languages */

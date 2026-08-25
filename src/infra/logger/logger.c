@@ -41,19 +41,6 @@ static void ensure_log_dir()
     }
 }
 
-static void* worker_compress(void* arg)
-{
-    compress_dirs();
-
-    while (1)
-    {
-        sleep(21600); /* 6h. */
-        compress_dirs();
-    }
-
-    return NULL;
-}
-
 static void* worker(void* arg)
 {
     while (1)
@@ -131,9 +118,6 @@ void logger_init()
 
     pthread_t thread_1;
     pthread_create(&thread_1, NULL, worker, NULL);
-
-    pthread_t thread_2;
-    pthread_create(&thread_2, NULL, worker_compress, NULL);
 }
 
 void logger_info(const char* fmt, ...)

@@ -23,7 +23,7 @@ COPY --from=libchttpx /usr/local/lib/pkgconfig/libchttpx.pc /usr/local/lib/pkgco
 COPY --from=libchttpx /usr/local/include/libchttpx /usr/local/include/libchttpx
 RUN ldconfig
 
-# Install mmdm
+# Install GeoIP database
 RUN wget https://github.com/P3TERX/GeoLite.mmdb/releases/latest/download/GeoLite2-Country.mmdb \
     && mkdir -p /usr/local/share/GeoIP \
     && cp GeoLite2-Country.mmdb /usr/local/share/GeoIP/
@@ -36,12 +36,14 @@ RUN make clean && make TARGET=server-http lin
 
 FROM kalilinux/kali-rolling
 
+ARG TARGETARCH
 WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq5 libcurl4 libssl3 libargon2-1 \
     uuid-runtime ca-certificates libmaxminddb0 \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && if [ "$TARGETARCH" = "arm64" ]; then echo aarch64-linux-gnu > /tmp/libtriplet; else echo x86_64-linux-gnu > /tmp/libtriplet; fi
 
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libhiredis*.so* /usr/lib/x86_64-linux-gnu/
 COPY --from=builder /usr/lib/x86_64-linux-gnu/libcjson*.so* /usr/lib/x86_64-linux-gnu/

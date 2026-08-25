@@ -79,6 +79,7 @@ void http_init(void)
 
     /* Cors */
     _cors();
+    fprintf(stderr, "startup: CORS configured\n");
 
     /* Initial middlewares */
     cHTTPX_MiddlewareRecovery();
@@ -94,6 +95,7 @@ void http_init(void)
 
     /* Initial routes */
     routes();
+    fprintf(stderr, "startup: routes registered\n");
 
     /* At the very end, to start listening to incoming requests from users. */
     cHTTPX_Listen();
