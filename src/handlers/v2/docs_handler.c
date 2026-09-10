@@ -8,8 +8,12 @@ void swagger_json_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 
 void swagger_gui_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
+    const char* base_addr = getenv("SERVER_BASE_ADDR");
+    if (!base_addr || base_addr[0] == '\0')
+        base_addr = "http://localhost:8080/api";
+
     char url[256];
-    snprintf(url, sizeof(url), "%s/v2", getenv("SERVER_BASE_ADDR"));
+    snprintf(url, sizeof(url), "%s/v2", base_addr);
 
     char swagger_html[8192];
     snprintf(swagger_html, sizeof(swagger_html),

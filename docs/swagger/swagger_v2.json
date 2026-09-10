@@ -12,7 +12,7 @@
   "paths": {
     "/auth/login": {
       "post": {
-        "summary": "Only logging in to your account will require 202 if you have a cloud password",
+        "summary": "Login with an email confirmation token and account password when configured",
         "tags": ["Auth"],
         "parameters": [
           {
@@ -137,7 +137,7 @@
           }
         },
         "responses": {
-          "200": {
+          "201": {
             "description": "Session ID",
             "content": {
               "application/json": {
@@ -288,11 +288,11 @@
             }
           },
           "202": {
-            "description": "Password required",
+            "description": "Email verified.",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MessageResponse"
+                  "$ref": "#/components/schemas/EmailConfirmationResponse"
                 }
               }
             }
@@ -307,8 +307,8 @@
               }
             }
           },
-          "404": {
-            "description": "User not found - need register",
+          "409": {
+            "description": "Email code is missing, expired or already consumed",
             "content": {
               "application/json": {
                 "schema": {

@@ -142,7 +142,9 @@ int send_email(const char* to, const char* subject, const char* body, const char
     if (curl)
     {
         char url[245];
-        snprintf(url, sizeof(url), "smtps://%s:%s", smtp_server, smtp_port);
+        /* Port 465 uses implicit TLS; 587 uses SMTP upgraded via STARTTLS. */
+        const char* scheme = strcmp(smtp_port, "465") == 0 ? "smtps" : "smtp";
+        snprintf(url, sizeof(url), "%s://%s:%s", scheme, smtp_server, smtp_port);
 
         struct curl_slist* recipients = NULL;
         recipients = curl_slist_append(recipients, to);
@@ -159,7 +161,7 @@ int send_email(const char* to, const char* subject, const char* body, const char
         curl_easy_setopt(curl, CURLOPT_READDATA, &upload_ctx);
         curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
 
-        curl_easy_setopt(curl, CURLOPT_USE_SSL, CURLUSESSL_ALL);
+        curl_easy_setopt(curl, CURLOPT_USE_SSL, (long)CURLUSESSL_ALL);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
         curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
         curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);

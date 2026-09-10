@@ -101,7 +101,7 @@ void auth_confirm_email_handler_v2(chttpx_request_t* req, chttpx_response_t* res
     const char* html = "<body>"
                        "<p>%s <b>%s</b></p>"
                        "<p>%s</p>"
-                       "<h2>%d</h2>"
+                       "<h2>%lu</h2>"
                        "<p>%s...</p>"
                        "<p>%s</p>"
                        "</body>";
@@ -163,12 +163,6 @@ void auth_login_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     /* To lower email */
     to_lower(payload.email);
 
-    if (!redis_is_email_confirmed(payload.email))
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusForbidden, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.confirm-email", ctx->lang));
-        goto cleanup;
-    }
-
     user = db_user_core_get_by_email(http_server->conn, payload.email);
     if (!user)
     {
@@ -188,6 +182,7 @@ void auth_login_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         *res = cHTTPX_ResJson(cHTTPX_StatusUnauthorized, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.incorrect-login-data", ctx->lang));
         goto cleanup;
     }
+
 
     session_t session = {.user_uid = user->user_uid, .expires_at = time(NULL) + REDIS_SESSION_TTL};
 
@@ -279,12 +274,6 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     trim_space(payload.email);
     /* To lower email */
     to_lower(payload.email);
-
-    if (!redis_is_email_confirmed(payload.email))
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusForbidden, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.confirm-email", ctx->lang));
-        goto cleanup;
-    }
 
     /* Check user is exists */
     user = db_user_core_get_by_email(http_server->conn, payload.email);
@@ -394,6 +383,7 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         goto cleanup;
     }
     user_active->user_uid = uid;
+
 
     db_result_t user_db_result = db_user_create(http_server->conn, user_core, user_profile, user_profile_access, user_active);
 
@@ -514,38 +504,21 @@ void auth_verify_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     if (!cHTTPX_Validate(req, fields, (sizeof(fields) / sizeof(fields[0])), ctx->lang))
         goto errorjson;
 
-    /* Verify code */
-    /* ----------- */
+    trim_space(payload.email);
+    to_lower(payload.email);
+
     int code;
-
-    if (!redis_verifycode_get(payload.email, &code))
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusConflict, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.no-active-mail-confirmation", ctx->lang));
-        goto cleanup;
-    }
-    /* ----------- */
-    /* Verify code */
-
-    if (payload.code != code)
+    if (!redis_verifycode_get(payload.email, &code) || payload.code != code)
     {
         *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.invalid-confirmation-code", ctx->lang));
         goto cleanup;
     }
 
-    /* Mark email has been confirmed */
-    redis_mark_email_confirmed(payload.email);
-
     user = db_user_core_get_by_email(http_server->conn, payload.email);
-    if (!user)
+    if (!user || (user->password && user->password[0] != '\0'))
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusNotFound, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.user-not-found", ctx->lang));
-        goto cleanup;
-    }
-
-    /* If user exist password -> 202 (redirect to /login) */
-    if (user->password && user->password[0] != '\0')
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusAccepted, "{\"message\": \"%s\"}", cHTTPX_i18n_t("error.password-required", ctx->lang));
+        redis_mark_email_confirmed(payload.email);
+        *res = cHTTPX_ResJson(cHTTPX_StatusAccepted, "{\"message\": \"%s\"}", user ? "password-required" : "registration-required");
         goto cleanup;
     }
 

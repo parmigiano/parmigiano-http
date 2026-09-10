@@ -23,5 +23,8 @@ char* hash_password(const char* password)
 
 int verify_password(const char* password, const char* hash)
 {
-    return argon2id_verify(hash, password, strlen(password) == ARGON2_OK);
+    if (!password || !hash || !password[0] || !hash[0])
+        return 0;
+
+    return argon2id_verify(hash, password, strlen(password)) == ARGON2_OK;
 }

@@ -88,7 +88,6 @@ void http_init(void)
     cHTTPX_MiddlewareUse(language_middleware);
     cHTTPX_MiddlewareUse(x_request_id_middleware);
     cHTTPX_MiddlewareUse(geoip_block_middleware);
-    cHTTPX_MiddlewareUse(body_entry_middleware);
     cHTTPX_MiddlewareUse(pow_ddos_middleware);
     cHTTPX_MiddlewareUse(authenticate_middleware);
     // cHTTPX_MiddlewareUse(email_confirmed_middleware);

@@ -11,6 +11,10 @@
 
 chttpx_middleware_result_t geoip_block_middleware(chttpx_request_t* req, chttpx_response_t* res)
 {
+    const char* env_type = getenv("TYPE");
+    if (!env_type || strcmp(env_type, "PROD") != 0)
+        return next;
+
     /* Lang code */
     const char* hal = cHTTPX_HeaderGet(req, "Accept-Language");
     char lang_code[3];
@@ -29,6 +33,8 @@ chttpx_middleware_result_t geoip_block_middleware(chttpx_request_t* req, chttpx_
     }
 
     const char* ip = cHTTPX_ClientIP(req);
+    if (!ip || ip[0] == '\0')
+        return next;
 
     int gai_error, mmdb_error;
 
@@ -42,7 +48,7 @@ chttpx_middleware_result_t geoip_block_middleware(chttpx_request_t* req, chttpx_
 
     int status = MMDB_get_value(&result.entry, &entry_data, "country", "iso_code", NULL);
 
-    if (status != MMDB_SUCCESS || !entry_data.has_data)
+    if (status != MMDB_SUCCESS || !entry_data.has_data || entry_data.type != MMDB_DATA_TYPE_UTF8_STRING || !entry_data.utf8_string)
     {
         return next;
     }

@@ -28,5 +28,6 @@ int main()
     cHTTPX_i18n(i18n_locate);
 
     /* Initial http server */
+    /* TEST */
     http_init();
 }

@@ -18,6 +18,12 @@ chttpx_middleware_result_t authenticate_middleware(chttpx_request_t* req, chttpx
     }
 
     auth_token_t* ctx = (auth_token_t*)req->context;
+    if (!ctx)
+    {
+        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"context initialization failed\"}");
+        return out;
+    }
+
     if (!ctx->lang)
     {
         ctx->lang = strdup(LANGUAGE_BASE);

@@ -26,6 +26,9 @@ chttpx_middleware_result_t x_request_id_middleware(chttpx_request_t* req, chttpx
     }
 
     auth_token_t* ctx = (auth_token_t*)req->context;
+    if (!ctx)
+        return next;
+
     if (!ctx->lang)
     {
         ctx->lang = strdup(LANGUAGE_BASE);
