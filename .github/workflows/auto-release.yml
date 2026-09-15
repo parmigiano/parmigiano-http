@@ -90,16 +90,16 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.tag.outputs.version_tag }}
-          name: parmigiano-chttp ${{ needs.tag.outputs.version_tag }}
+          name: parmigiano-http ${{ needs.tag.outputs.version_tag }}
           generate_release_notes: true
           body: |
             ## Docker
 
             ```bash
-            docker pull ghcr.io/parmigiano/parmigiano-chttp:${{ needs.tag.outputs.version_tag }}
-            docker run --rm -p 8080:8080 --env-file .env ghcr.io/parmigiano/parmigiano-chttp:${{ needs.tag.outputs.version_tag }}
+            docker pull ghcr.io/parmigiano/parmigiano-http:${{ needs.tag.outputs.version_tag }}
+            docker run --rm -p 8080:8080 --env-file .env ghcr.io/parmigiano/parmigiano-http:${{ needs.tag.outputs.version_tag }}
             ```
 
             ## Compose
 
-            See [docker-compose.prod.yml](https://github.com/parmigiano/parmigiano-chttp/blob/main/docker-compose.prod.yml) for the full production stack.
+            See [docker-compose.prod.yml](https://github.com/parmigiano/parmigiano-http/blob/main/docker-compose.prod.yml) for the full production stack.

@@ -1,5 +1,5 @@
 name: Feature request
-description: Suggest a new feature or improvement for parmigiano-chttp
+description: Suggest a new feature or improvement for parmigiano-http
 title: "[Feature]: "
 labels: ["enhancement"]
 body:

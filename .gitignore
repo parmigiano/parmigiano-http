@@ -1,71 +1,15 @@
-# Prerequisites
-*.d
+.npm/
+.vs/
+.vscode/
+.cache/
+Debug/
+Release/
 
-# Object files
-*.o
-*.ko
-*.obj
-*.elf
-*.zip
-*.tar
-*.tar.gz
+go/
+node/
+choco/
+__pycache__
+python/
 
-*.build
-
-*.vscode/
-logs/
-log/
-lt_models/
-lt_model/
-
-# Linker output
-*.ilk
-*.map
-*.exp
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Libraries
-*.lib
-*.a
-*.la
-*.lo
-
-# Shared objects (inc. Windows DLLs)
-*.dll
-*.so
-*.so.*
-*.dylib
-
-*.env
-*.env.production
-*.env.docker
-env.docker
-
-# Executables
-*.exe
-*.out
-*.app
-*.i*86
-*.x86_64
-*.hex
-
-# Debug files
-*.dSYM/
-*.su
-*.idb
-*.pdb
-
-# Kernel Module Compile Results
-*.mod*
-*.cmd
-.tmp_versions/
-modules.order
-Module.symvers
-Mkfile.old
-dkms.conf
-
-# debug information files
-*.dwo
+.idea/
+tmp/

@@ -25,7 +25,7 @@ jobs:
           context: .
           push: false
           load: true
-          tags: parmigiano-chttp:pr-${{ github.event.pull_request.number }}
+          tags: parmigiano-http:pr-${{ github.event.pull_request.number }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -37,8 +37,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         with:
           script: |
-            const markerStart = '<!-- parmigiano-chttp-docker -->';
-            const markerEnd = '<!-- /parmigiano-chttp-docker -->';
+            const markerStart = '<!-- parmigiano-http-docker -->';
+            const markerEnd = '<!-- /parmigiano-http-docker -->';
             const runId = process.env.RUN_ID;
             const prNumber = process.env.PR_NUMBER;
             const { owner, repo } = context.repo;

@@ -1,10 +1,10 @@
 blank_issues_enabled: true
 contact_links:
   - name: API documentation (Swagger)
-    url: https://github.com/parmigiano/parmigiano-chttp/blob/main/docs/swagger/swagger_v2.json
+    url: https://github.com/parmigiano/parmigiano-http/blob/main/docs/swagger/swagger_v2.json
     about: OpenAPI spec for the v2 HTTP API
   - name: Releases
-    url: https://github.com/parmigiano/parmigiano-chttp/releases
+    url: https://github.com/parmigiano/parmigiano-http/releases
     about: Download tagged Docker images and release notes
   - name: libchttpx (dependency)
     url: https://github.com/noneandundefined/libchttpx

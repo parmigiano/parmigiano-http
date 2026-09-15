@@ -1,0 +1,18 @@
+#include <libchttpx/libchttpx.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+int main(void)
+{
+    cHTTPX_i18n("/app/src/infra/locale");
+    chttpx_request_t* req = calloc(1, sizeof(*req));
+    const char* body = "{\"email\":\"fdgdf@dsfsd.sdfsd\"}";
+    req->body = (unsigned char*)body;
+    req->body_size = req->content_length = strlen(body);
+    strcpy(req->content_type, "application/json");
+    char* email = NULL;
+    chttpx_validation_t fields[] = {chttpx_validation_string("email", &email, true, 5, 254, VALIDATOR_EMAIL)};
+    fprintf(stderr, "parse=%d\n", cHTTPX_Parse(req, fields, 1));
+    fprintf(stderr, "validate=%d error=%s\n", cHTTPX_Validate(req, fields, 1, "en"), req->error_msg);
+    free(email); free(req);
+}
