@@ -94,6 +94,31 @@ services:
             retries: 12
             start_period: 15s
 
+    rabbitmq:
+        image: rabbitmq:3-management
+        restart: unless-stopped
+        environment:
+            RABBITMQ_DEFAULT_USER: guest
+            RABBITMQ_DEFAULT_PASS: guest
+        volumes:
+            - rabbitmq_data:/var/lib/rabbitmq
+        ports:
+            - '5672:5672'
+            - '15672:15672'
+        healthcheck:
+            test: ['CMD', 'rabbitmq-diagnostics', '-q', 'ping']
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 10s
+        security_opt:
+            - no-new-privileges:true
+        logging:
+            driver: json-file
+            options:
+                max-size: '10m'
+                max-file: '3'
+
     http_server:
         restart: always
         build:
@@ -111,6 +136,8 @@ services:
                 condition: service_healthy
             libretranslate:
                 condition: service_started
+            rabbitmq:
+                condition: service_healthy
         networks:
             parmigiano:
                 aliases:
@@ -126,6 +153,7 @@ services:
 volumes:
     # ollama_phi_data:
     lt_data:
+    rabbitmq_data:
 
 networks:
     parmigiano:
