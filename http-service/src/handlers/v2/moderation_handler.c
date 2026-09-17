@@ -344,7 +344,7 @@ rmq_action_t moderation_data_handler_v2(const rmq_message_t* message, void* user
 
     if (moderation_media_delete_object(target) != 0)
     {
-        logger_error("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 ": DB target removed but S3 cleanup failed",
+        logger_error("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 "}: DB target removed but S3 cleanup failed",
                      target->target_type, target->target_id);
     }
 
