@@ -22,9 +22,16 @@ void media_upload_in_chat_handler_v2(chttpx_request_t* req, chttpx_response_t* r
         return;
     }
 
-    /* Initial URL avatar */
     char* s3_key = NULL;
-    const chttpx_file_t* file = cHTTPX_RequestFile(req);
+    bool remove_uploaded_file = false;
+    message_t* message = NULL;
+
+    s3_config_t s3_config = {0};
+
+    /* Prefer multipart/form-data field `file`, keep raw upload compatibility. */
+    const chttpx_file_t* file = cHTTPX_FormFile(req, "file");
+    if (!file)
+        file = cHTTPX_RequestFile(req);
 
     uint64_t chat_id = 0;
     if (!cHTTPX_ParamU64(req, "chat_id", &chat_id))
@@ -40,7 +47,7 @@ void media_upload_in_chat_handler_v2(chttpx_request_t* req, chttpx_response_t* r
         goto cleanup;
     }
 
-    if (!file)
+    if (!file || !file->path || file->size == 0)
     {
         logger_error("media_upload_in_chat_handler_v2 req={%s}: empty media file", req->request_id);
         *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.no-data-to-process", req->language));
@@ -55,7 +62,7 @@ void media_upload_in_chat_handler_v2(chttpx_request_t* req, chttpx_response_t* r
         goto cleanup;
     }
 
-    s3_config_t s3_config = {
+    s3_config = (s3_config_t){
         .endpoint = getenv("S3_ENDPOINT"),
         .bucket = getenv("S3_BUCKET_PRV"),
         .access_key = getenv("S3_ACCESS_KEY"),
@@ -63,12 +70,11 @@ void media_upload_in_chat_handler_v2(chttpx_request_t* req, chttpx_response_t* r
         .region = getenv("S3_REGION"),
     };
 
-    /* key for s3 storage */
     char s3_chat_media_key[256];
     snprintf(s3_chat_media_key, sizeof(s3_chat_media_key), "chats/%" PRIu64, chat_id);
 
-    /* save to s3 storage */
-    s3_key = s3_upload_file_prv(f, file->path, file->content_type, s3_chat_media_key, &s3_config);
+    /* Use the original multipart filename; file->path is a temporary path without extension. */
+    s3_key = s3_upload_file_prv(f, file->original_name, file->content_type, s3_chat_media_key, &s3_config);
     fclose(f);
 
     if (!s3_key || *s3_key == '\0')
@@ -76,20 +82,18 @@ void media_upload_in_chat_handler_v2(chttpx_request_t* req, chttpx_response_t* r
         *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.save-file", req->language));
         goto cleanup;
     }
+    remove_uploaded_file = true;
 
     const char* mime_file_type = map_mime_to_msg_type(file->content_type);
 
-    /* calloc message_t */
-    message_t* message = calloc(1, sizeof(message_t));
+    message = calloc(1, sizeof(message_t));
     if (!message)
     {
         logger_error("media_upload_in_chat_handler_v2 req={%s}: calloc failed for message_t", req->request_id);
-
-        fprintf(stderr, "calloc failed\n");
         *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
-
         goto cleanup;
     }
+
     message->chat_id = chat_id;
     message->sender_uid = ctx->user->user_uid;
     message->content = strdup(s3_key);
@@ -97,26 +101,16 @@ void media_upload_in_chat_handler_v2(chttpx_request_t* req, chttpx_response_t* r
 
     if (!message->content || !message->content_type)
     {
-        free(message->content);
-        free(message->content_type);
-        free(message);
-
         *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
         goto cleanup;
     }
 
-    /* update in database */
     db_result_t message_db_result = db_message_create_all(http_server->conn, message);
-
-    /* free memory */
-    free(message->content);
-    free(message->content_type);
-    free(message);
-    message = NULL;
 
     switch (message_db_result)
     {
     case DB_OK:
+        remove_uploaded_file = false;
         break;
 
     case DB_TIMEOUT:
@@ -135,8 +129,18 @@ void media_upload_in_chat_handler_v2(chttpx_request_t* req, chttpx_response_t* r
     *res = cHTTPX_ResNoContent();
 
 cleanup:
-    if (s3_key)
-        free(s3_key);
+    if (remove_uploaded_file && s3_key)
+    {
+        if (s3_delete_key(s3_key, &s3_config) != 0)
+            logger_error("media_upload_in_chat_handler_v2 req={%s}: failed to rollback S3 upload key={%s}", req->request_id, s3_key);
+    }
 
-    return;
+    if (message)
+    {
+        free(message->content);
+        free(message->content_type);
+        free(message);
+    }
+
+    free(s3_key);
 }
