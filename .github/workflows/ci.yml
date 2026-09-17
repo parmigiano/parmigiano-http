@@ -30,10 +30,13 @@ jobs:
       - name: Run cppcheck
         working-directory: http-service
         run: |
+          # cppcheck 2.13 miscounts snprintf arguments when PRIu64 is
+          # concatenated into a runtime format string in auth_handler.c.
           cppcheck \
             --std=c11 \
             --enable=warning,performance,portability \
             --suppress=missingIncludeSystem \
+            --suppress=wrongPrintfScanfArgNum:src/handlers/v2/auth_handler.c \
             --inline-suppr \
             --error-exitcode=1 \
             -I include \
