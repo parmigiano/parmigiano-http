@@ -17,8 +17,8 @@ typedef struct {
     uint64_t blocked_by_uid;
 } user_block_t;
 
-/* Returns the newest active block for a user, or NULL when the user is not blocked. */
-user_block_t* db_user_block_get_active(PGconn* conn, uint64_t user_uid);
+/* DB_OK + *out_block == NULL means the user is not blocked. */
+db_result_t db_user_block_get_active(PGconn* conn, uint64_t user_uid, user_block_t** out_block);
 
 /* Create a block. blocked_until == 0 means a permanent block. */
 db_result_t db_user_block_create(PGconn* conn,
