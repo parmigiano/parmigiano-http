@@ -4,6 +4,7 @@
 
 #include <libs3.h>
 #include <ctype.h>
+#include <pthread.h>
 #include <stdbool.h>
 #include <string.h>
 #include <uuid/uuid.h>
@@ -14,6 +15,51 @@ typedef struct
     bool completed;
     bool success;
 } s3_request_ctx_t;
+
+static pthread_mutex_t s3_init_mutex = PTHREAD_MUTEX_INITIALIZER;
+static bool s3_initialized = false;
+static bool s3_cleanup_registered = false;
+
+static void s3_global_deinitialize(void)
+{
+    pthread_mutex_lock(&s3_init_mutex);
+
+    if (s3_initialized)
+    {
+        S3_deinitialize();
+        s3_initialized = false;
+    }
+
+    pthread_mutex_unlock(&s3_init_mutex);
+}
+
+static bool ensure_s3_initialized(const char* endpoint)
+{
+    bool ready = false;
+
+    pthread_mutex_lock(&s3_init_mutex);
+
+    if (s3_initialized)
+    {
+        ready = true;
+    }
+    else if (S3_initialize("parmigianochat/v2", S3_INIT_ALL, endpoint) == S3StatusOK)
+    {
+        s3_initialized = true;
+        ready = true;
+
+        if (!s3_cleanup_registered)
+        {
+            if (atexit(s3_global_deinitialize) == 0)
+                s3_cleanup_registered = true;
+            else
+                logger_warn("ensure_s3_initialized: failed to register libs3 cleanup");
+        }
+    }
+
+    pthread_mutex_unlock(&s3_init_mutex);
+    return ready;
+}
 
 static int put_object_cb(int bufferSize, char* buffer, void* callbackData)
 {
@@ -217,7 +263,7 @@ static char* upload_file(FILE* f, const char* filename, const char* content_type
     if (!unique_key)
         return NULL;
 
-    if (S3_initialize("parmigianochat/v2", S3_INIT_ALL, cfg->endpoint) != S3StatusOK)
+    if (!ensure_s3_initialized(cfg->endpoint))
     {
         free(unique_key);
         return NULL;
@@ -241,7 +287,6 @@ static char* upload_file(FILE* f, const char* filename, const char* content_type
     put_props.contentType = content_type && *content_type ? content_type : "application/octet-stream";
 
     S3_put_object(&bucket, unique_key, (uint64_t)size, &put_props, NULL, 0, &handler, &request_ctx);
-    S3_deinitialize();
 
     if (!request_ctx.completed || !request_ctx.success)
     {
@@ -278,7 +323,7 @@ int s3_delete_key(const char* key, s3_config_t* cfg)
     if (!key || !*key || !config_valid(cfg))
         return 1;
 
-    if (S3_initialize("parmigianochat/v2", S3_INIT_ALL, cfg->endpoint) != S3StatusOK)
+    if (!ensure_s3_initialized(cfg->endpoint))
         return 1;
 
     s3_request_ctx_t request_ctx = {
@@ -291,7 +336,6 @@ int s3_delete_key(const char* key, s3_config_t* cfg)
     S3ResponseHandler handler = {.completeCallback = response_complete_cb, .propertiesCallback = NULL};
 
     S3_delete_object(&bucket, key, NULL, 0, &handler, &request_ctx);
-    S3_deinitialize();
 
     return request_ctx.completed && request_ctx.success ? 0 : 1;
 }
