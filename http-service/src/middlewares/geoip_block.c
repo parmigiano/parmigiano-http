@@ -15,23 +15,6 @@ chttpx_middleware_result_t geoip_block_middleware(chttpx_request_t* req, chttpx_
     if (!env_type || strcmp(env_type, "PROD") != 0)
         return next;
 
-    /* Lang code */
-    const char* hal = cHTTPX_HeaderGet(req, "Accept-Language");
-    char lang_code[3];
-
-    if (!hal)
-    {
-        lang_code[0] = 'e';
-        lang_code[1] = 'n';
-        lang_code[2] = '\0';
-    }
-    else
-    {
-        lang_code[0] = hal[0];
-        lang_code[1] = hal[1];
-        lang_code[2] = '\0';
-    }
-
     const char* ip = cHTTPX_ClientIP(req);
     if (!ip || ip[0] == '\0')
         return next;
@@ -55,7 +38,8 @@ chttpx_middleware_result_t geoip_block_middleware(chttpx_request_t* req, chttpx_
 
     if (strncmp(entry_data.utf8_string, "RU", 2) != 0)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusForbidden, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.location-allowed", lang_code));
+        const char* language = req->language[0] ? req->language : LANGUAGE_BASE;
+        *res = cHTTPX_ResError(cHTTPX_StatusForbidden, cHTTPX_i18n_t("error.location-allowed", language));
         return out;
     }
 

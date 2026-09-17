@@ -83,7 +83,7 @@ static char* create_unique_key(const char* filename, const char* key_p)
     return strdup(uniq_key);
 }
 
-char* s3_upload_file_pub(FILE* f, const char* filename, char* content_type, const char* key, s3_config_t* cfg)
+char* s3_upload_file_pub(FILE* f, const char* filename, const char* content_type, const char* key, s3_config_t* cfg)
 {
     if (!f || !filename || !cfg)
         return NULL;
@@ -120,7 +120,7 @@ char* s3_upload_file_pub(FILE* f, const char* filename, char* content_type, cons
     return strdup(url);
 }
 
-char* s3_upload_file_prv(FILE* f, const char* filename, char* content_type, const char* key, s3_config_t* cfg)
+char* s3_upload_file_prv(FILE* f, const char* filename, const char* content_type, const char* key, s3_config_t* cfg)
 {
     if (!f || !filename || !cfg)
         return NULL;

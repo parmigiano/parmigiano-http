@@ -6,6 +6,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <libpq-fe.h>
 
 typedef enum {
@@ -15,12 +16,12 @@ typedef enum {
     DB_TIMEOUT = -2
 } db_result_t;
 
-inline char* parse_pg_strdup(const char* s)
+static inline char* parse_pg_strdup(const char* s)
 {
     return s ? strdup(s) : NULL;
 }
 
-inline time_t parse_pg_timestamp(const char* s)
+static inline time_t parse_pg_timestamp(const char* s)
 {
     if (!s) return 0;
 
@@ -41,7 +42,7 @@ inline time_t parse_pg_timestamp(const char* s)
     return mktime(&tm) - timezone;
 }
 
-inline bool parse_pg_bool(const char* s)
+static inline bool parse_pg_bool(const char* s)
 {
     return s && (s[0] == 't' || s[0] == '1');
 }

@@ -7,6 +7,7 @@
 #include "utilities.h"
 
 #include <string.h>
+#include <inttypes.h>
 #include <cjson/cJSON.h>
 #include <libchttpx/libchttpx.h>
 
@@ -20,206 +21,152 @@ typedef struct
     char* message;
 } chat_bot_ai_t;
 
+static chttpx_response_t chat_preview_response(chttpx_request_t* req, const chat_preview_LIST_t* chats)
+{
+    chttpx_json_t* root = cHTTPX_JsonObject(req);
+    chttpx_json_t* message = cHTTPX_JsonArray(req);
+
+    if (!root || !message)
+        return cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+
+    if (chats)
+    {
+        for (size_t i = 0; i < chats->count; ++i)
+        {
+            const chat_preview_t* chat = &chats->items[i];
+            chttpx_json_t* item = cHTTPX_JsonObject(req);
+
+            if (!item || cHTTPX_JsonNumber(item, "id", (double)chat->id) != 0 ||
+                cHTTPX_JsonString(item, "name", chat->name) != 0 ||
+                cHTTPX_JsonString(item, "username", chat->username) != 0 ||
+                cHTTPX_JsonString(item, "avatar", chat->avatar) != 0 ||
+                cHTTPX_JsonNumber(item, "user_uid", (double)chat->user_uid) != 0 ||
+                cHTTPX_JsonString(item, "last_message", chat->last_message) != 0 ||
+                cHTTPX_JsonNumber(item, "last_message_date", (double)chat->last_message_date) != 0 ||
+                cHTTPX_JsonNumber(item, "unread_message_count", chat->unread_message_count) != 0 ||
+                cHTTPX_JsonArrayChild(message, item) != 0)
+            {
+                return cHTTPX_ResError(cHTTPX_StatusInternalServerError,
+                                       cHTTPX_i18n_t("error.something-went-wrong", req->language));
+            }
+        }
+    }
+
+    if (cHTTPX_JsonChild(root, "message", message) != 0)
+        return cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+
+    return cHTTPX_ResJsonObject(cHTTPX_StatusOK, root);
+}
+
+static chttpx_response_t chat_setting_response(chttpx_request_t* req, const chat_setting_t* setting)
+{
+    chttpx_json_t* root = cHTTPX_JsonObject(req);
+    chttpx_json_t* message = cHTTPX_JsonObject(req);
+
+    if (!root || !message || cHTTPX_JsonNumber(message, "id", (double)setting->id) != 0 ||
+        cHTTPX_JsonNumber(message, "created_at", (double)setting->created_at) != 0 ||
+        cHTTPX_JsonNumber(message, "updated_at", (double)setting->updated_at) != 0 ||
+        cHTTPX_JsonNumber(message, "chat_id", (double)setting->chat_id) != 0 ||
+        cHTTPX_JsonString(message, "custom_background", setting->custom_background) != 0 ||
+        cHTTPX_JsonBool(message, "blocked", setting->blocked) != 0 ||
+        cHTTPX_JsonNumber(message, "who_blocked_uid", (double)setting->who_blocked_uid) != 0 ||
+        cHTTPX_JsonChild(root, "message", message) != 0)
+    {
+        return cHTTPX_ResError(cHTTPX_StatusInternalServerError,
+                               cHTTPX_i18n_t("error.something-went-wrong", req->language));
+    }
+
+    return cHTTPX_ResJsonObject(cHTTPX_StatusOK, root);
+}
+
+static void chat_preview_list_free(chat_preview_LIST_t* chats)
+{
+    if (!chats)
+        return;
+
+    for (size_t i = 0; i < chats->count; ++i)
+    {
+        free(chats->items[i].name);
+        free(chats->items[i].username);
+        free(chats->items[i].avatar);
+        free(chats->items[i].last_message);
+    }
+
+    free(chats);
+}
+
 void chat_get_my_history_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
-    auth_token_t* ctx = (auth_token_t*)req->context;
-
-    const char* offset_query = cHTTPX_Query(req, "offset");
-
-    size_t offset = 0;
-    if (offset_query && *offset_query != '\0')
-        offset = strtoull(offset_query, NULL, 10);
-
-    chat_preview_LIST_t* chats_preview = NULL;
-    chats_preview = db_chat_get_my_history(http_server->conn, ctx->user->user_uid, offset);
-    if (!chats_preview || chats_preview->count == 0)
+    auth_token_t* ctx = cHTTPX_ContextGet(req, AUTH_CONTEXT_NAME);
+    if (!ctx || !ctx->user)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusOK, "{\"message\": []}");
-        goto cleanup;
+        *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
+        return;
     }
 
-    size_t capacity = 8192;
-    char* json = malloc(capacity);
-    size_t len_json = 0;
-
-    len_json += snprintf(json + len_json, capacity - len_json, "{\"message\": [");
-
-    for (size_t i = 0; i < chats_preview->count; i++)
+    uint64_t offset_value = 0;
+    if (!cHTTPX_QueryU64Default(req, "offset", &offset_value, 0))
     {
-        chat_preview_t* chat = &chats_preview->items[i];
-
-        char item[2048];
-
-        snprintf(item, sizeof(item),
-                 "{"
-                 "\"id\":%lu,"
-                 "\"name\":\"%s\","
-                 "\"username\":\"%s\","
-                 "\"avatar\":\"%s\","
-                 "\"user_uid\":%lu,"
-                 "\"last_message\":\"%s\","
-                 "\"last_message_date\":%ld,"
-                 "\"unread_message_count\":%u"
-                 "}%s",
-                 chat->id, chat->name ? chat->name : "", chat->username ? chat->username : "", chat->avatar ? chat->avatar : "", chat->user_uid,
-                 chat->last_message ? chat->last_message : "", chat->last_message_date, chat->unread_message_count,
-                 (i + 1 < chats_preview->count) ? "," : "");
-
-        size_t need_len = strlen(item);
-
-        if (len_json + need_len + 1 > capacity)
-        {
-            capacity *= 2;
-            json = realloc(json, capacity);
-        }
-
-        memcpy(json + len_json, item, need_len);
-        len_json += need_len;
+        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.invalid-offset", req->language));
+        return;
     }
+    size_t offset = (size_t)offset_value;
 
-    snprintf(json + len_json, capacity - len_json, "]}");
-
-    *res = cHTTPX_ResJson(cHTTPX_StatusOK, "%s", json);
-
-    free(json);
-
-cleanup:
-    if (chats_preview)
-    {
-        for (size_t i = 0; i < chats_preview->count; i++)
-        {
-            free(chats_preview->items[i].name);
-            free(chats_preview->items[i].username);
-            free(chats_preview->items[i].avatar);
-            free(chats_preview->items[i].last_message);
-        }
-
-        free(chats_preview);
-        chats_preview = NULL;
-    }
-
-    return;
+    chat_preview_LIST_t* chats_preview = db_chat_get_my_history(http_server->conn, ctx->user->user_uid, offset);
+    *res = chat_preview_response(req, chats_preview);
+    chat_preview_list_free(chats_preview);
 }
 
 void chat_get_by_username_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
-    auth_token_t* ctx = (auth_token_t*)req->context;
+    auth_token_t* ctx = cHTTPX_ContextGet(req, AUTH_CONTEXT_NAME);
+    if (!ctx || !ctx->user)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
+        return;
+    }
 
     const char* username_param = cHTTPX_Param(req, "username");
 
-    chat_preview_LIST_t* chats_preview = NULL;
-    chats_preview = db_chat_get_by_username(http_server->conn, ctx->user->user_uid, username_param);
-    if (!chats_preview || chats_preview->count == 0)
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusOK, "{\"message\": []}");
-        goto cleanup;
-    }
-
-    size_t capacity = 8192;
-    char* json = malloc(capacity);
-    size_t len_json = 0;
-
-    len_json += snprintf(json + len_json, capacity - len_json, "{\"message\": [");
-
-    for (size_t i = 0; i < chats_preview->count; i++)
-    {
-        chat_preview_t* chat = &chats_preview->items[i];
-
-        char item[2048];
-
-        snprintf(item, sizeof(item),
-                 "{"
-                 "\"id\":%lu,"
-                 "\"name\":\"%s\","
-                 "\"username\":\"%s\","
-                 "\"avatar\":\"%s\","
-                 "\"user_uid\":%lu,"
-                 "\"last_message\":\"%s\","
-                 "\"last_message_date\":%ld,"
-                 "\"unread_message_count\":%u"
-                 "}%s",
-                 chat->id, chat->name ? chat->name : "", chat->username ? chat->username : "", chat->avatar ? chat->avatar : "", chat->user_uid,
-                 chat->last_message ? chat->last_message : "", chat->last_message_date, chat->unread_message_count,
-                 (i + 1 < chats_preview->count) ? "," : "");
-
-        size_t need_len = strlen(item);
-
-        if (len_json + need_len + 1 > capacity)
-        {
-            capacity *= 2;
-            json = realloc(json, capacity);
-        }
-
-        memcpy(json + len_json, item, need_len);
-        len_json += need_len;
-    }
-
-    snprintf(json + len_json, capacity - len_json, "]}");
-
-    *res = cHTTPX_ResJson(cHTTPX_StatusOK, "%s", json);
-
-    free(json);
-
-cleanup:
-    if (chats_preview)
-    {
-        for (size_t i = 0; i < chats_preview->count; i++)
-        {
-            free(chats_preview->items[i].name);
-            free(chats_preview->items[i].username);
-            free(chats_preview->items[i].avatar);
-            free(chats_preview->items[i].last_message);
-        }
-
-        free(chats_preview);
-        chats_preview = NULL;
-    }
-
-    return;
+    chat_preview_LIST_t* chats_preview = db_chat_get_by_username(http_server->conn, ctx->user->user_uid, username_param);
+    *res = chat_preview_response(req, chats_preview);
+    chat_preview_list_free(chats_preview);
 }
 
 void chat_get_settings_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
-    auth_token_t* ctx = (auth_token_t*)req->context;
+    auth_token_t* ctx = cHTTPX_ContextGet(req, AUTH_CONTEXT_NAME);
+    if (!ctx || !ctx->user)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
+        return;
+    }
 
     /* DB. get chat setting */
     chat_setting_t* chat_setting = NULL;
 
-    const char* chat_id_param = cHTTPX_Param(req, "chat_id");
-
     uint64_t chat_id = 0;
-    if (chat_id_param && *chat_id_param != '\0')
-        chat_id = strtoull(chat_id_param, NULL, 10);
+    if (!cHTTPX_ParamU64(req, "chat_id", &chat_id))
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.invalid-chat-id", req->language));
+        return;
+    }
 
     bool is_member = db_chat_get_member_exists_by_chat_id(http_server->conn, chat_id, ctx->user->user_uid);
     if (!is_member)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusForbidden, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.not-member-chat", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusForbidden, cHTTPX_i18n_t("error.not-member-chat", req->language));
         goto cleanup;
     }
 
     chat_setting = db_chat_get_setting_by_chat_id(http_server->conn, chat_id);
     if (!chat_setting)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusNotFound, "{\"message\": \"NULL\"}");
+        *res = cHTTPX_ResError(cHTTPX_StatusNotFound, cHTTPX_i18n_t("error.chat-setting-not-found", req->language));
         goto cleanup;
     }
 
-    *res = cHTTPX_ResJson(cHTTPX_StatusOK,
-                          "{"
-                          "\"message\": {"
-                          "\"id\": %lu,"
-                          "\"created_at\": %ld,"
-                          "\"updated_at\": %ld,"
-                          "\"chat_id\": %lu,"
-                          "\"custom_background\": \"%s\","
-                          "\"blocked\": %s,"
-                          "\"who_blocked_uid\": %lu"
-                          "}"
-                          "}",
-                          chat_setting->id, chat_setting->created_at, chat_setting->updated_at, chat_setting->chat_id,
-                          chat_setting->custom_background ? chat_setting->custom_background : "", chat_setting->blocked ? "true" : "false",
-                          chat_setting->who_blocked_uid);
+    *res = chat_setting_response(req, chat_setting);
 
 cleanup:
     if (chat_setting)
@@ -235,54 +182,61 @@ cleanup:
 
 void chat_upload_custom_bg_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
-    auth_token_t* ctx = (auth_token_t*)req->context;
+    auth_token_t* ctx = cHTTPX_ContextGet(req, AUTH_CONTEXT_NAME);
+    if (!ctx || !ctx->user)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
+        return;
+    }
 
     /* db. get chat_setting */
     chat_setting_t* chat_setting = NULL;
     /* Initial URL avatar */
     char* url = NULL;
-
-    const char* chat_id_param = cHTTPX_Param(req, "chat_id");
+    const chttpx_file_t* file = cHTTPX_RequestFile(req);
 
     uint64_t chat_id = 0;
-    if (chat_id_param && *chat_id_param != '\0')
-        chat_id = strtoull(chat_id_param, NULL, 10);
+    if (!cHTTPX_ParamU64(req, "chat_id", &chat_id))
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.invalid-chat-id", req->language));
+        return;
+    }
 
     bool is_member = db_chat_get_member_exists_by_chat_id(http_server->conn, chat_id, ctx->user->user_uid);
     if (!is_member)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusForbidden, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.not-member-chat", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusForbidden, cHTTPX_i18n_t("error.not-member-chat", req->language));
         goto cleanup;
     }
 
-    if (req->filename[0] == '\0')
+    if (!file)
     {
-        logger_error("chat_upload_custom_bg_handler_v2 req={%s}: empty media file", ctx->x_req_id);
-        *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.no-data-to-process", ctx->lang));
+        logger_error("chat_upload_custom_bg_handler_v2 req={%s}: empty media file", req->request_id);
+        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.no-data-to-process", req->language));
         goto cleanup;
     }
 
     /* Jpeg/Jpg | Png */
-    if (strcmp(req->content_type, cHTTPX_CTYPE_JPEG) != 0 && strcmp(req->content_type, cHTTPX_CTYPE_PNG) != 0)
+    if (!cHTTPX_MimeMatch(file->content_type, cHTTPX_CTYPE_JPEG) && !cHTTPX_MimeMatch(file->content_type, cHTTPX_CTYPE_PNG))
     {
-        logger_error("chat_upload_custom_bg_handler_v2 req={%s}: failed to load media forbidden file extension (%s)", ctx->x_req_id,
-                     req->content_type);
-        *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.forbidden-file-extension", ctx->lang));
+        logger_error("chat_upload_custom_bg_handler_v2 req={%s}: failed to load media forbidden file extension (%s)", req->request_id,
+                     file->content_type);
+        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.forbidden-file-extension", req->language));
         goto cleanup;
     }
 
     chat_setting = db_chat_get_setting_by_chat_id(http_server->conn, chat_id);
     if (!chat_setting)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusNotFound, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.chat-setting-not-found", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusNotFound, cHTTPX_i18n_t("error.chat-setting-not-found", req->language));
         goto cleanup;
     }
 
-    FILE* f = fopen(req->filename, "rb");
+    FILE* f = fopen(file->path, "rb");
     if (!f)
     {
-        logger_error("chat_upload_custom_bg_handler_v2 req={%s}: failed open temporary file", ctx->x_req_id);
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.open-temporary-file", ctx->lang));
+        logger_error("chat_upload_custom_bg_handler_v2 req={%s}: failed open temporary file", req->request_id);
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.open-temporary-file", req->language));
         goto cleanup;
     }
 
@@ -295,23 +249,23 @@ void chat_upload_custom_bg_handler_v2(chttpx_request_t* req, chttpx_response_t* 
     };
 
     char s3_bg_chat_key[256];
-    snprintf(s3_bg_chat_key, sizeof(s3_bg_chat_key), "bg_chat_id_%ld", chat_id);
+    snprintf(s3_bg_chat_key, sizeof(s3_bg_chat_key), "bg_chat_id_%" PRIu64, chat_id);
 
-    url = s3_upload_file_pub(f, req->filename, req->content_type, s3_bg_chat_key, &s3_config);
+    url = s3_upload_file_pub(f, file->path, file->content_type, s3_bg_chat_key, &s3_config);
     fclose(f);
 
     if (!url || *url == '\0')
     {
-        logger_error("chat_upload_custom_bg_handler_v2 req={%s}: failed save file to S3 cloud", ctx->x_req_id);
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.save-file", ctx->lang));
+        logger_error("chat_upload_custom_bg_handler_v2 req={%s}: failed save file to S3 cloud", req->request_id);
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.save-file", req->language));
         goto cleanup;
     }
 
     /* Delete old custom bg in S3 */
     if (s3_delete_file(chat_setting->custom_background ? chat_setting->custom_background : "", &s3_config) != 0)
     {
-        logger_error("chat_upload_custom_bg_handler_v2 req={%s}: failed to delete file in S3 cloud", ctx->x_req_id);
-        *res = cHTTPX_ResJson(cHTTPX_StatusConflict, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.s3-cloud", ctx->lang));
+        logger_error("chat_upload_custom_bg_handler_v2 req={%s}: failed to delete file in S3 cloud", req->request_id);
+        *res = cHTTPX_ResError(cHTTPX_StatusConflict, cHTTPX_i18n_t("error.s3-cloud", req->language));
         goto cleanup;
     }
 
@@ -320,29 +274,23 @@ void chat_upload_custom_bg_handler_v2(chttpx_request_t* req, chttpx_response_t* 
 
     switch (chat_db_result)
     {
+    case DB_OK:
+        break;
+
     case DB_TIMEOUT:
-        *res = cHTTPX_ResJson(cHTTPX_StatusConnectionTimedOut, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.database-connection-timeout", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusConnectionTimedOut, cHTTPX_i18n_t("error.database-connection-timeout", req->language));
         goto cleanup;
 
     case DB_DUPLICATE:
-        *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.repeating-data-request", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.repeating-data-request", req->language));
         goto cleanup;
 
     case DB_ERROR:
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.perform-database-operation", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
         goto cleanup;
     }
 
-    char* safe_url = escape_json_string(url);
-    if (safe_url)
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusOK, "{\"message\": \"%s\"}", safe_url);
-        free(safe_url);
-    }
-    else
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.something-went-wrong", ctx->lang));
-    }
+    *res = cHTTPX_ResMessage(cHTTPX_StatusOK, url);
 
 cleanup:
     if (chat_setting)
@@ -356,28 +304,26 @@ cleanup:
     if (url)
         free(url);
 
-    if (req->filename[0] != '\0')
-        remove(req->filename);
-
     return;
 }
 
 void chat_translate_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
-    /* Context in request */
-    auth_token_t* ctx = (auth_token_t*)req->context;
+    auth_token_t* ctx = cHTTPX_ContextGet(req, AUTH_CONTEXT_NAME);
+    if (!ctx || !ctx->user)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
+        return;
+    }
 
     chat_translate_t payload = {0};
 
     chttpx_validation_t fields[] = {
-        chttpx_validation_string("text", &payload.text, true, 0, 3000, VALIDATOR_NONE),
+        cHTTPX_StringField("text", &payload.text, true, 0, 3000, CHTTPX_NORMALIZE_NONE, NULL),
     };
 
-    if (!cHTTPX_Parse(req, fields, (sizeof(fields) / sizeof(fields[0]))))
-        goto errorjson;
-
-    if (!cHTTPX_Validate(req, fields, (sizeof(fields) / sizeof(fields[0])), ctx->lang))
-        goto errorjson;
+    if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))
+        return;
 
     /* Safe message string */
     cJSON* root = cJSON_CreateObject();
@@ -387,8 +333,8 @@ void chat_translate_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 
     if (!text_json)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.something-went-wrong", ctx->lang));
-        goto cleanup;
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+        return;
     }
 
     /* Detect language text */
@@ -418,49 +364,30 @@ void chat_translate_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     free(lang);
 
     char* translated_text = get_translated_text(translated);
-    char* safe = escape_json_string(translated_text ? translated_text : "");
-    if (safe)
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusOK, "{\"message\": \"%s\"}", safe);
-        free(safe);
-    }
-    else
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.something-went-wrong", ctx->lang));
-    }
+    *res = cHTTPX_ResMessage(cHTTPX_StatusOK, translated_text ? translated_text : "");
 
     free(translated_text);
     free(translated);
     free(text_json);
-
-cleanup:
-    /* Free payloads */
-    free(payload.text);
-
-    return;
-
-errorjson:
-    *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", req->error_msg);
-
-    goto cleanup;
 }
 
 void chat_bot_default_ai_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
-    /* Context in request */
-    auth_token_t* ctx = (auth_token_t*)req->context;
+    auth_token_t* ctx = cHTTPX_ContextGet(req, AUTH_CONTEXT_NAME);
+    if (!ctx || !ctx->user)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
+        return;
+    }
 
     chat_bot_ai_t payload = {0};
 
     chttpx_validation_t fields[] = {
-        chttpx_validation_string("message", &payload.message, true, 0, 3000, VALIDATOR_NONE),
+        cHTTPX_StringField("message", &payload.message, true, 0, 3000, CHTTPX_NORMALIZE_NONE, NULL),
     };
 
-    if (!cHTTPX_Parse(req, fields, (sizeof(fields) / sizeof(fields[0]))))
-        goto errorjson;
-
-    if (!cHTTPX_Validate(req, fields, (sizeof(fields) / sizeof(fields[0])), ctx->lang))
-        goto errorjson;
+    if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))
+        return;
 
     /* Safe message string */
     cJSON* root = cJSON_CreateObject();
@@ -470,8 +397,8 @@ void chat_bot_default_ai_handler_v2(chttpx_request_t* req, chttpx_response_t* re
 
     if (!message_json)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.something-went-wrong", ctx->lang));
-        goto cleanup;
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+        return;
     }
 
     char* bot_ai_response = call_ai_text(message_json);
@@ -479,36 +406,15 @@ void chat_bot_default_ai_handler_v2(chttpx_request_t* req, chttpx_response_t* re
 
     if (bot_ai_response == NULL)
     {
-        logger_error("chat_bot_default_ai_handler_v2 req={%s}: failed to get response by defailt AI BOT", ctx->x_req_id);
+        logger_error("chat_bot_default_ai_handler_v2 req={%s}: failed to get response by defailt AI BOT", req->request_id);
 
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.service-temporarily-error", ctx->lang));
-        goto cleanup;
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.service-temporarily-error", req->language));
+        return;
     }
 
     char* ai_text = get_ollama_response(bot_ai_response);
     free(bot_ai_response);
 
-    char* safe = escape_json_string(ai_text ? ai_text : "");
+    *res = cHTTPX_ResMessage(cHTTPX_StatusOK, ai_text ? ai_text : "");
     free(ai_text);
-
-    if (safe)
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusOK, "{\"message\": \"%s\"}", safe);
-        free(safe);
-    }
-    else
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.something-went-wrong", ctx->lang));
-    }
-
-cleanup:
-    /* Free payloads */
-    free(payload.message);
-
-    return;
-
-errorjson:
-    *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", req->error_msg);
-
-    goto cleanup;
 }

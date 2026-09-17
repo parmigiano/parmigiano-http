@@ -7,7 +7,7 @@ CLANG_FORMAT = clang-format
 
 OBJDIR = .out
 BINDIR = .build
-LIN_LDFLAGS = -pthread -luuid -lchttpx -lpq -lcrypto -ls3 -lcurl -lssl -largon2 -lhiredis -lcjson -lmaxminddb
+LIN_LDFLAGS = -pthread -luuid -lchttpx -lpq -lcrypto -ls3 -lcurl -lssl -largon2 -lhiredis -lcjson -lmaxminddb -lrabbitmq
 WIN_LDFLAGS = -lws2_32
 
 LIN_SRCS = $(filter-out ./lib/cjson/cJSON.c, $(shell find . -name '*.c'))

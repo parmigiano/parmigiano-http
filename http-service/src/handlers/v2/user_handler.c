@@ -2,73 +2,129 @@
 
 #include "s3.h"
 #include "httpx.h"
+#include "logger.h"
+#include "nsfw.h"
 #include "utilities.h"
+
+#include <inttypes.h>
 
 void user_me_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
-    auth_token_t* ctx = (auth_token_t*)req->context;
-
-    if (!ctx->user)
+    auth_token_t* ctx = cHTTPX_ContextGet(req, AUTH_CONTEXT_NAME);
+	if (!ctx || !ctx->user)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusNotFound, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.user-not-found", ctx->lang));
-        goto cleanup;
+        *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
+        return;
     }
 
-    *res = cHTTPX_ResJson(
-        cHTTPX_StatusOK,
-        "{"
-        "\"message\": {"
-        "\"id\": %lu,"
-        "\"created_at\": %ld,"
-        "\"user_uid\": %lu,"
-        "\"avatar\": \"%s\","
-        "\"name\": \"%s\","
-        "\"username\": \"%s\","
-        "\"username_visible\": %s,"
-        "\"email\": \"%s\","
-        "\"email_visible\": %s,"
-        "\"email_confirm\": %s,"
-        "\"phone\": \"%s\","
-        "\"phone_visible\": %s,"
-        "\"overview\": \"%s\""
-        "}"
-        "}",
-        ctx->user->id, ctx->user->created_at, ctx->user->user_uid, ctx->user->avatar ? ctx->user->avatar : "", ctx->user->name ? ctx->user->name : "",
-        ctx->user->username ? ctx->user->username : "", ctx->user->username_visible ? "true" : "false", ctx->user->email ? ctx->user->email : "",
-        ctx->user->email_visible ? "true" : "false", ctx->user->email_confirm ? "true" : "false", ctx->user->phone ? ctx->user->phone : "",
-        ctx->user->phone_visible ? "true" : "false", ctx->user->overview ? ctx->user->overview : "");
+    chttpx_json_t* root = cHTTPX_JsonObject(req);
+    chttpx_json_t* message = cHTTPX_JsonObject(req);
 
-cleanup:
+    if (!root || !message || cHTTPX_JsonNumber(message, "id", (double)ctx->user->id) != 0 ||
+        cHTTPX_JsonNumber(message, "created_at", (double)ctx->user->created_at) != 0 ||
+        cHTTPX_JsonNumber(message, "user_uid", (double)ctx->user->user_uid) != 0 ||
+        cHTTPX_JsonString(message, "avatar", ctx->user->avatar) != 0 ||
+        cHTTPX_JsonString(message, "name", ctx->user->name) != 0 ||
+        cHTTPX_JsonString(message, "username", ctx->user->username) != 0 ||
+        cHTTPX_JsonBool(message, "username_visible", ctx->user->username_visible) != 0 ||
+        cHTTPX_JsonString(message, "email", ctx->user->email) != 0 ||
+        cHTTPX_JsonBool(message, "email_visible", ctx->user->email_visible) != 0 ||
+        cHTTPX_JsonBool(message, "email_confirm", ctx->user->email_confirm) != 0 ||
+        cHTTPX_JsonString(message, "phone", ctx->user->phone) != 0 ||
+        cHTTPX_JsonBool(message, "phone_visible", ctx->user->phone_visible) != 0 ||
+        cHTTPX_JsonString(message, "overview", ctx->user->overview) != 0 ||
+        cHTTPX_JsonChild(root, "message", message) != 0)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+        return;
+    }
 
-    return;
+    *res = cHTTPX_ResJsonObject(cHTTPX_StatusOK, root);
 }
 
 void user_upload_avatar_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
-    auth_token_t* ctx = (auth_token_t*)req->context;
+    auth_token_t* ctx = cHTTPX_ContextGet(req, AUTH_CONTEXT_NAME);
+	if (!ctx || !ctx->user)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
+        return;
+    }
 
     /* Initial URL avatar */
     char* url = NULL;
+    const chttpx_file_t* file = cHTTPX_RequestFile(req);
 
-    if (req->filename[0] == '\0')
+    if (!file)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.no-data-to-process", ctx->lang));
-        goto cleanup;
+        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.no-data-to-process", req->language));
+        return;
     }
 
     /* Jpeg/Jpg | Png | Gif */
-    if (strcmp(req->content_type, cHTTPX_CTYPE_JPEG) != 0 && strcmp(req->content_type, cHTTPX_CTYPE_PNG) != 0 &&
-        strcmp(req->content_type, cHTTPX_CTYPE_GIF) != 0)
+    if (!cHTTPX_MimeIsImage(file->content_type))
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.forbidden-file-extension", ctx->lang));
-        goto cleanup;
+        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.forbidden-file-extension", req->language));
+        return;
     }
 
-    FILE* f = fopen(req->filename, "rb");
+    /* Moderate before publishing the avatar to S3 or updating the profile. */
+    nsfw_error_t nsfw_error;
+    nsfw_result_t nsfw_result = nsfw_check_file_from_env(file->path, file->content_type, &nsfw_error);
+
+    if (nsfw_result != NSFW_OK)
+    {
+        uint16_t status = cHTTPX_StatusServiceUnavailable;
+
+        switch (nsfw_result)
+        {
+        case NSFW_REJECTED:
+            status = cHTTPX_StatusUnprocessableEntity;
+            break;
+        case NSFW_EMPTY_IMAGE:
+        case NSFW_INVALID_IMAGE:
+            status = cHTTPX_StatusBadRequest;
+            break;
+        case NSFW_IMAGE_TOO_LARGE:
+            status = cHTTPX_StatusPayloadTooLarge;
+            break;
+        case NSFW_UNSUPPORTED_MEDIA:
+            status = cHTTPX_StatusUnsupportedMediaType;
+            break;
+        case NSFW_TIMEOUT:
+            status = cHTTPX_StatusGatewayTimeout;
+            break;
+        case NSFW_INVALID_ARGUMENT:
+        case NSFW_INVALID_URL:
+        case NSFW_FILE_ERROR:
+        case NSFW_OUT_OF_MEMORY:
+        case NSFW_CLIENT_ERROR:
+            status = cHTTPX_StatusInternalServerError;
+            break;
+        case NSFW_INVALID_RESPONSE:
+        case NSFW_RESPONSE_TOO_LARGE:
+        case NSFW_SERVICE_ERROR:
+        case NSFW_HTTP_ERROR:
+            status = cHTTPX_StatusBadGateway;
+            break;
+        default:
+            break;
+        }
+
+        if (nsfw_result != NSFW_REJECTED)
+        {
+            logger_error("user_upload_avatar_handler_v2 req={%s}: NSFW check failed: %s", req->request_id ? req->request_id : "", nsfw_error.detail);
+        }
+
+        *res = cHTTPX_ResError(status, cHTTPX_i18n_t(nsfw_result_locale_key(nsfw_result), req->language));
+        return;
+    }
+
+    FILE* f = fopen(file->path, "rb");
     if (!f)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.open-temporary-file", ctx->lang));
-        goto cleanup;
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.open-temporary-file", req->language));
+        return;
     }
 
     s3_config_t s3_config = {
@@ -81,15 +137,15 @@ void user_upload_avatar_handler_v2(chttpx_request_t* req, chttpx_response_t* res
 
     /* key for s3 storage */
     char s3_avatar_key[128];
-    snprintf(s3_avatar_key, sizeof(s3_avatar_key), "avatar_user_uid_%ld", ctx->user->user_uid);
+    snprintf(s3_avatar_key, sizeof(s3_avatar_key), "avatar_user_uid_%" PRIu64, ctx->user->user_uid);
 
     /* save to s3 storage */
-    url = s3_upload_file_pub(f, req->filename, req->content_type, s3_avatar_key, &s3_config);
+    url = s3_upload_file_pub(f, file->path, file->content_type, s3_avatar_key, &s3_config);
     fclose(f);
 
     if (!url || *url == '\0')
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.save-file", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.save-file", req->language));
         goto cleanup;
     }
 
@@ -98,86 +154,80 @@ void user_upload_avatar_handler_v2(chttpx_request_t* req, chttpx_response_t* res
 
     switch (user_upd_result)
     {
+    case DB_OK:
+        break;
+
     case DB_TIMEOUT:
-        *res = cHTTPX_ResJson(cHTTPX_StatusConnectionTimedOut, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.database-connection-timeout", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusConnectionTimedOut, cHTTPX_i18n_t("error.database-connection-timeout", req->language));
         goto cleanup;
 
     case DB_DUPLICATE:
-        *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.repeating-data-request", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.repeating-data-request", req->language));
         goto cleanup;
 
     case DB_ERROR:
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.perform-database-operation", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
         goto cleanup;
     }
 
-    char* safe_url = escape_json_string(url);
-    if (safe_url)
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusOK, "{\"message\": \"%s\"}", safe_url);
-        free(safe_url);
-    }
-    else
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.something-went-wrong", ctx->lang));
-    }
+    *res = cHTTPX_ResMessage(cHTTPX_StatusOK, url);
 
 cleanup:
     if (url)
         free(url);
-
-    if (req->filename[0] != '\0')
-        remove(req->filename);
 
     return;
 }
 
 void user_get_profile_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
-    auth_token_t* ctx = (auth_token_t*)req->context;
+    auth_token_t* ctx = cHTTPX_ContextGet(req, AUTH_CONTEXT_NAME);
+    if (!ctx || !ctx->user)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
+        return;
+    }
 
     /* DB. get user info */
     user_info_t* user = NULL;
 
-    /* Get from params -> user_uid */
-    const char* user_uid_param = cHTTPX_Param(req, "user_uid");
-    if (!user_uid_param || *user_uid_param == '\0')
+    uint64_t user_uid = 0;
+    if (!cHTTPX_ParamU64(req, "user_uid", &user_uid))
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.user-not-found", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.user-not-found", req->language));
         goto cleanup;
     }
-
-    uint64_t user_uid = strtoull(user_uid_param, NULL, 10);
 
     user = db_user_info_get_by_uid(http_server->conn, user_uid);
     if (!user)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusNotFound, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.user-not-found", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusNotFound, cHTTPX_i18n_t("error.user-not-found", req->language));
         goto cleanup;
     }
 
-    *res = cHTTPX_ResJson(cHTTPX_StatusOK,
-                          "{"
-                          "\"message\": {"
-                          "\"id\": %lu,"
-                          "\"created_at\": %ld,"
-                          "\"user_uid\": %lu,"
-                          "\"avatar\": \"%s\","
-                          "\"name\": \"%s\","
-                          "\"username\": \"%s\","
-                          "\"username_visible\": %s,"
-                          "\"email\": \"%s\","
-                          "\"email_visible\": %s,"
-                          "\"email_confirm\": %s,"
-                          "\"phone\": \"%s\","
-                          "\"phone_visible\": %s,"
-                          "\"overview\": \"%s\""
-                          "}"
-                          "}",
-                          user->id, user->created_at, user->user_uid, user->avatar ? user->avatar : "", user->name ? user->name : "",
-                          user->username ? user->username : "", user->username_visible ? "true" : "false", user->email ? user->email : "",
-                          user->email_visible ? "true" : "false", user->email_confirm ? "true" : "false", user->phone ? user->phone : "",
-                          user->phone_visible ? "true" : "false", user->overview ? user->overview : "");
+    chttpx_json_t* root = cHTTPX_JsonObject(req);
+    chttpx_json_t* message = cHTTPX_JsonObject(req);
+
+    if (!root || !message || cHTTPX_JsonNumber(message, "id", (double)user->id) != 0 ||
+        cHTTPX_JsonNumber(message, "created_at", (double)user->created_at) != 0 ||
+        cHTTPX_JsonNumber(message, "user_uid", (double)user->user_uid) != 0 ||
+        cHTTPX_JsonString(message, "avatar", user->avatar) != 0 ||
+        cHTTPX_JsonString(message, "name", user->name) != 0 ||
+        cHTTPX_JsonString(message, "username", user->username) != 0 ||
+        cHTTPX_JsonBool(message, "username_visible", user->username_visible) != 0 ||
+        cHTTPX_JsonString(message, "email", user->email) != 0 ||
+        cHTTPX_JsonBool(message, "email_visible", user->email_visible) != 0 ||
+        cHTTPX_JsonBool(message, "email_confirm", user->email_confirm) != 0 ||
+        cHTTPX_JsonString(message, "phone", user->phone) != 0 ||
+        cHTTPX_JsonBool(message, "phone_visible", user->phone_visible) != 0 ||
+        cHTTPX_JsonString(message, "overview", user->overview) != 0 ||
+        cHTTPX_JsonChild(root, "message", message) != 0)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+        goto cleanup;
+    }
+
+    *res = cHTTPX_ResJsonObject(cHTTPX_StatusOK, root);
 
 cleanup:
     if (user)
@@ -191,101 +241,76 @@ cleanup:
 
 void user_update_profile_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
-    auth_token_t* ctx = (auth_token_t*)req->context;
+    auth_token_t* ctx = cHTTPX_ContextGet(req, AUTH_CONTEXT_NAME);
+    if (!ctx || !ctx->user)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
+        return;
+    }
 
     user_profile_update_t payload = {0};
+    bool username_visible = false;
+    bool email_visible = false;
+    bool phone_visible = false;
 
     chttpx_validation_t fields[] = {
-        chttpx_validation_string("username", &payload.username, false, 4, 24, VALIDATOR_NONE),
-        chttpx_validation_boolean("username_visible", &payload.username, false),
-        chttpx_validation_string("name", &payload.name, false, 2, 24, VALIDATOR_NONE),
-        chttpx_validation_string("email", &payload.email, false, 5, 254, VALIDATOR_EMAIL),
-        chttpx_validation_boolean("email_visible", &payload.email_visible, false),
-        chttpx_validation_string("phone", &payload.phone, false, 8, 254, VALIDATOR_NONE),
-        chttpx_validation_boolean("phone_visible", &payload.phone_visible, false),
-        chttpx_validation_string("overview", &payload.overview, false, 1, 125, VALIDATOR_NONE),
-        chttpx_validation_string("password", &payload.password, false, 8, 16, VALIDATOR_NONE),
+        cHTTPX_StringField("username", &payload.username, false, 4, 24, CHTTPX_TRIM, validate_username),
+        chttpx_validation_boolean("username_visible", &username_visible, false),
+        cHTTPX_StringField("name", &payload.name, false, 0, 96, CHTTPX_TRIM, validate_name),
+        cHTTPX_StringField("email", &payload.email, false, 5, 254, CHTTPX_TRIM | CHTTPX_LOWERCASE, validate_email),
+        chttpx_validation_boolean("email_visible", &email_visible, false),
+        cHTTPX_StringField("phone", &payload.phone, false, 8, 254, CHTTPX_TRIM, NULL),
+        chttpx_validation_boolean("phone_visible", &phone_visible, false),
+        cHTTPX_StringField("overview", &payload.overview, false, 1, 125, CHTTPX_TRIM, NULL),
+        cHTTPX_StringField("password", &payload.password, false, 8, 16, CHTTPX_NORMALIZE_NONE, validate_password),
     };
 
-    if (!cHTTPX_Parse(req, fields, (sizeof(fields) / sizeof(fields[0]))))
-        goto errorjson;
+    if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))
+        return;
 
-    if (!cHTTPX_Validate(req, fields, (sizeof(fields) / sizeof(fields[0])), ctx->lang))
-        goto errorjson;
-
-    /* Trim spaces */
-    if (payload.username)
-        trim_space(payload.username);
-
-    if (payload.email)
-    {
-        trim_space(payload.email);
-        to_lower(payload.email);
-    }
-
-    /* Validate username */
-    if (payload.username && !is_valid(payload.username))
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.invalid-username", ctx->lang));
-        goto cleanup;
-    }
+    payload.username_visible = fields[1].present ? &username_visible : NULL;
+    payload.email_visible = fields[4].present ? &email_visible : NULL;
+    payload.phone_visible = fields[6].present ? &phone_visible : NULL;
 
     char* password_hash = NULL;
 
     if (payload.password)
     {
-        /* Trim space password */
-        trim_space(payload.password);
-
-        if (is_simple_password(payload.password))
-        {
-            *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.weak-password", ctx->lang));
-            goto cleanup;
-        }
-
         password_hash = hash_password(payload.password);
         if (!password_hash)
         {
-            *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.password-hash-failed", ctx->lang));
+            *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.password-hash-failed", req->language));
             goto cleanup;
         }
 
         payload.password = password_hash;
-        password_hash = NULL;
     }
 
     db_result_t user_db_result = db_user_UPDATE_upd(http_server->conn, ctx->user->user_uid, &payload);
 
     switch (user_db_result)
     {
+    case DB_OK:
+        break;
+
     case DB_TIMEOUT:
-        *res = cHTTPX_ResJson(cHTTPX_StatusConnectionTimedOut, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.database-connection-timeout", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusConnectionTimedOut, cHTTPX_i18n_t("error.database-connection-timeout", req->language));
         goto cleanup;
 
     case DB_DUPLICATE:
-        *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.repeating-data-request", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.repeating-data-request", req->language));
         goto cleanup;
 
     case DB_ERROR:
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.perform-database-operation", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
         goto cleanup;
     }
 
-    *res = cHTTPX_ResJson(cHTTPX_StatusOK, "{\"message\": \"%s\"}", cHTTPX_i18n_t("profile-updated", ctx->lang));
+    *res = cHTTPX_ResMessage(cHTTPX_StatusOK, cHTTPX_i18n_t("profile-updated", req->language));
 
 cleanup:
-    /* Payloads free */
-    free(payload.username);
-    free(payload.name);
-    free(payload.email);
-    free(payload.phone);
-    free(payload.overview);
-    free(payload.password);
+    free(password_hash);
 
     return;
 
-errorjson:
-    *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", req->error_msg);
-
-    goto cleanup;
 }

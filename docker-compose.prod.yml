@@ -94,6 +94,32 @@ services:
             retries: 12
             start_period: 15s
 
+    rabbitmq:
+        image: rabbitmq:3-management
+        restart: unless-stopped
+        environment:
+            RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?Set RABBITMQ_USER}
+            RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?Set RABBITMQ_PASSWORD}
+        volumes:
+            - rabbitmq_data:/var/lib/rabbitmq
+        networks:
+            parmigiano:
+                aliases:
+                    - rabbitmq
+        healthcheck:
+            test: ['CMD-SHELL', 'rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_port_connectivity']
+            interval: 10s
+            timeout: 5s
+            retries: 5
+            start_period: 10s
+        security_opt:
+            - no-new-privileges:true
+        logging:
+            driver: json-file
+            options:
+                max-size: '10m'
+                max-file: '3'
+
     http_server:
         restart: always
         build:
@@ -105,6 +131,8 @@ services:
         ports:
             - '8080:8080'
         depends_on:
+            rabbitmq:
+                condition: service_healthy
             nsfw:
                 condition: service_healthy
             profanity:
@@ -126,6 +154,7 @@ services:
 volumes:
     # ollama_phi_data:
     lt_data:
+    rabbitmq_data:
 
 networks:
     parmigiano:

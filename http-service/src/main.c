@@ -15,7 +15,7 @@ int main()
     curl_global_init(CURL_GLOBAL_DEFAULT);
 
     /* ENV.. */
-    env_init(".env.docker"); /* .env.production */
+    env_init(".env"); /* .env.production */
 
     const char* i18n_locate = getenv("I18N_LOCATE");
     if (!i18n_locate || i18n_locate[0] == '\0')

@@ -13,6 +13,7 @@
 
 #include <time.h>
 #include <stdbool.h>
+#include <inttypes.h>
 #include <openssl/err.h>
 #include <openssl/rand.h>
 
@@ -45,33 +46,22 @@ typedef struct
 
 void auth_confirm_email_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
-    /* Context in request */
-    auth_token_t* ctx = (auth_token_t*)req->context;
-
     auth_confirm_email_t payload = {0};
 
     chttpx_validation_t fields[] = {
-        chttpx_validation_string("email", &payload.email, true, 5, 254, VALIDATOR_EMAIL),
+        cHTTPX_StringField("email", &payload.email, true, 5, 254, CHTTPX_TRIM | CHTTPX_LOWERCASE, validate_email),
     };
 
-    if (!cHTTPX_Parse(req, fields, (sizeof(fields) / sizeof(fields[0]))))
-        goto errorjson;
-
-    if (!cHTTPX_Validate(req, fields, (sizeof(fields) / sizeof(fields[0])), ctx->lang))
-        goto errorjson;
-
-    /* Trim spaces */
-    trim_space(payload.email);
-    /* To lower email */
-    to_lower(payload.email);
+    if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))
+        return;
 
     /* Check limits verification code (24h.) */
     if (redis_check_limit_email_and_increment(payload.email, MAX_EMAIL_LIMITS_24H) != 1)
     {
-        logger_error("auth_confirm_email_handler_v2 req={%s}: exceeded daily limit (:email)", ctx->x_req_id);
+        logger_error("auth_confirm_email_handler_v2 req={%s}: exceeded daily limit (:email)", req->request_id);
 
-        *res = cHTTPX_ResJson(cHTTPX_StatusTooManyRequests, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.email-limit-24-hourse", ctx->lang));
-        goto cleanup;
+        *res = cHTTPX_ResError(cHTTPX_StatusTooManyRequests, cHTTPX_i18n_t("error.email-limit-24-hourse", req->language));
+        return;
     }
 
     uint64_t code;
@@ -79,125 +69,103 @@ void auth_confirm_email_handler_v2(chttpx_request_t* req, chttpx_response_t* res
     {
         unsigned long err_code = ERR_get_error();
         char err_buf[256];
+
         ERR_error_string_n(err_code, err_buf, sizeof(err_buf));
 
-        logger_error("auth_confirm_email_handler_v2 req={%s}: failed to generate CODE: %s", ctx->x_req_id, err_buf);
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.code-generate-failed", ctx->lang));
+        logger_error("auth_confirm_email_handler_v2 req={%s}: failed to generate CODE: %s", req->request_id, err_buf);
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.code-generate-failed", req->language));
 
-        goto cleanup;
+        return;
     }
     code = (code % 900000) + 100000;
 
     if (redis_verifycode_create(payload.email, code) != 0)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.code-save-failed", ctx->lang));
-        goto cleanup;
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.code-save-failed", req->language));
+        return;
     }
 
-    logger_info("auth_confirm_email_handler_v2 req={%s}: email={%s} code={%lu}", ctx->x_req_id, payload.email, code);
+    logger_info("auth_confirm_email_handler_v2 req={%s}: email={%s} code={%" PRIu64 "}", req->request_id, payload.email, code);
 
     /* Send email */
     /* ---------- */
     const char* html = "<body>"
                        "<p>%s <b>%s</b></p>"
                        "<p>%s</p>"
-                       "<h2>%lu</h2>"
+                       "<h2>%" PRIu64 "</h2>"
                        "<p>%s...</p>"
                        "<p>%s</p>"
                        "</body>";
 
     char buffer[2048];
-    snprintf(buffer, sizeof(buffer), html, cHTTPX_i18n_t("email.request-notice", ctx->lang), payload.email,
-             cHTTPX_i18n_t("email.code-instruction", ctx->lang), code, cHTTPX_i18n_t("email.code-expire", ctx->lang),
-             cHTTPX_i18n_t("email.footer", ctx->lang));
+    snprintf(buffer, sizeof(buffer), html, cHTTPX_i18n_t("email.request-notice", req->language), payload.email,
+             cHTTPX_i18n_t("email.code-instruction", req->language), code, cHTTPX_i18n_t("email.code-expire", req->language),
+             cHTTPX_i18n_t("email.footer", req->language));
 
-    if (send_email_async(payload.email, cHTTPX_i18n_t("email.subject", ctx->lang), buffer, NULL) != 0)
+    if (send_email_async(payload.email, cHTTPX_i18n_t("email.subject", req->language), buffer, NULL) != 0)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s: %s\"}", cHTTPX_i18n_t("error.sending-email", ctx->lang),
-                              payload.email);
-        goto cleanup;
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.sending-email", req->language));
+        return;
     }
     /* ---------- */
     /* Send email */
 
-    *res = cHTTPX_ResJson(cHTTPX_StatusOK, "{\"message\": \"%s\"}", cHTTPX_i18n_t("code-sent", ctx->lang));
-
-cleanup:
-    /* Free payloads */
-    free(payload.email);
-
-    return;
-
-errorjson:
-    *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", req->error_msg);
-
-    goto cleanup;
+    *res = cHTTPX_ResMessage(cHTTPX_StatusOK, cHTTPX_i18n_t("code-sent", req->language));
 }
 
 void auth_logout_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
-    const char* authorization = cHTTPX_HeaderGet(req, "Authorization");
-    if (!authorization || strncasecmp(authorization, "Bearer ", 7) != 0 || !authorization[7])
+    const char* session_id = cHTTPX_BearerToken(req);
+    if (!session_id)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusUnauthorized, "{\"error\": \"session required\"}");
+        *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
         return;
     }
 
-    if (!redis_session_delete(authorization + 7))
+    if (!redis_session_delete(session_id))
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"session revocation failed\"}");
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
         return;
     }
 
-    *res = cHTTPX_ResJson(cHTTPX_StatusNoContent, NULL);
+    *res = cHTTPX_ResNoContent();
 }
 
 void auth_login_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
-    /* Context in request */
-    auth_token_t* ctx = (auth_token_t*)req->context;
-
     /* Initial session id */
     char* session_id = NULL;
 
     auth_login_t payload = {0};
 
     chttpx_validation_t fields[] = {
-        chttpx_validation_string("email", &payload.email, true, 5, 254, VALIDATOR_EMAIL),
-        chttpx_validation_string("password", &payload.password, false, 8, 16, VALIDATOR_NONE),
+		cHTTPX_StringField("email", &payload.email, true, 5, 254, CHTTPX_TRIM | CHTTPX_LOWERCASE, validate_email),
+        cHTTPX_StringField("password", &payload.password, false, 8, 16, CHTTPX_NORMALIZE_NONE, NULL),
     };
 
     /* DB. get user core */
     user_core_t* user = NULL;
 
-    if (!cHTTPX_Parse(req, fields, (sizeof(fields) / sizeof(fields[0]))))
-        goto errorjson;
-
-    if (!cHTTPX_Validate(req, fields, (sizeof(fields) / sizeof(fields[0])), ctx->lang))
-        goto errorjson;
-
-    /* Trim spaces */
-    trim_space(payload.email);
-    /* To lower email */
-    to_lower(payload.email);
+    if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))
+        return;
 
     user = db_user_core_get_by_email(http_server->conn, payload.email);
     if (!user)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusNotFound, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.user-not-found", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusNotFound, cHTTPX_i18n_t("error.user-not-found", req->language));
         goto cleanup;
     }
 
     /* If user exist password, but not in payload -> 202 */
     if (user->password && user->password[0] != '\0' && !payload.password)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusAccepted, "{\"message\": \"%s\"}", cHTTPX_i18n_t("error.password-required", ctx->lang));
+        *res = cHTTPX_ResMessage(cHTTPX_StatusAccepted, cHTTPX_i18n_t("error.password-required", req->language));
         goto cleanup;
     }
 
     if (user->password && user->password[0] != '\0' && !verify_password(payload.password, user->password))
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusUnauthorized, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.incorrect-login-data", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.incorrect-login-data", req->language));
         goto cleanup;
     }
 
@@ -207,60 +175,37 @@ void auth_login_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     session_id = redis_session_create(&session);
     if (!session_id)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.session-creation-error", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.session-creation-error", req->language));
         goto cleanup;
     }
 
-    char* safe_session = escape_json_string(session_id);
-    if (safe_session)
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusOK, "{\"message\": \"%s\"}", safe_session);
-        free(safe_session);
-    }
-    else
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.session-creation-error", ctx->lang));
-    }
+    *res = cHTTPX_ResMessage(cHTTPX_StatusOK, session_id);
 
 cleanup:
-    /* Free payloads */
-    free(payload.email);
-    if (payload.password)
-        free(payload.password);
-
     if (user)
     {
         free(user->email);
         free(user->password);
         free(user);
-        user = NULL;
     }
 
     if (session_id)
         free(session_id);
 
-    return;
-
-errorjson:
-    *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", req->error_msg);
-
-    goto cleanup;
 }
 
 void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
-    auth_token_t* ctx = (auth_token_t*)req->context;
-
     /* Initial session id */
     char* session_id = NULL;
 
     auth_create_t payload = {0};
 
     chttpx_validation_t fields[] = {
-        chttpx_validation_string("name", &payload.name, true, 2, 24, VALIDATOR_NONE),
-        chttpx_validation_string("username", &payload.username, true, 4, 24, VALIDATOR_NONE),
-        chttpx_validation_string("email", &payload.email, true, 5, 254, VALIDATOR_EMAIL),
-        chttpx_validation_string("password", &payload.password, false, 8, 16, VALIDATOR_NONE),
+        cHTTPX_StringField("name", &payload.name, true, 0, 96, CHTTPX_TRIM, validate_name),
+        cHTTPX_StringField("username", &payload.username, true, 4, 24, CHTTPX_TRIM, validate_username),
+        cHTTPX_StringField("email", &payload.email, true, 5, 254, CHTTPX_TRIM | CHTTPX_LOWERCASE, validate_email),
+        cHTTPX_StringField("password", &payload.password, false, 8, 16, CHTTPX_NORMALIZE_NONE, validate_password),
     };
 
     /* DB. get user core */
@@ -271,33 +216,14 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     user_profile_access_t* user_profile_access = NULL;
     user_active_t* user_active = NULL;
 
-    if (!cHTTPX_Parse(req, fields, (sizeof(fields) / sizeof(fields[0]))))
-        goto errorjson;
-
-    if (!cHTTPX_Validate(req, fields, (sizeof(fields) / sizeof(fields[0])), ctx->lang))
-        goto errorjson;
-
-    /* Trim spaces */
-    trim_space(payload.username);
-    trim_space(payload.email);
-
-    /* Check symbols */
-    if (!is_valid(payload.username))
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.invalid-username", ctx->lang));
-        goto cleanup;
-    }
-
-    /* Trim spaces */
-    trim_space(payload.email);
-    /* To lower email */
-    to_lower(payload.email);
+    if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))
+        return;
 
     /* Check user is exists */
     user = db_user_core_get_by_email(http_server->conn, payload.email);
     if (user)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.user-already-registered", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.user-already-registered", req->language));
 
         free(user->email);
         free(user->password);
@@ -310,19 +236,10 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     /* Validation password and hash password */
     if (payload.password)
     {
-        /* Trim space password */
-        trim_space(payload.password);
-
-        if (is_simple_password(payload.password))
-        {
-            *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.weak-password", ctx->lang));
-            goto cleanup;
-        }
-
         password_hash = hash_password(payload.password);
         if (!password_hash)
         {
-            *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.password-hash-failed", ctx->lang));
+            *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.password-hash-failed", req->language));
             goto cleanup;
         }
     }
@@ -334,21 +251,21 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         char err_buf[256];
         ERR_error_string_n(err_code, err_buf, sizeof(err_buf));
 
-        logger_error("auth_create_handler_v2 req={%s}: failed to generate UID: %s", ctx->x_req_id, err_buf);
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.user-uid-generate-failed", ctx->lang));
+        logger_error("auth_create_handler_v2 req={%s}: failed to generate UID: %s", req->request_id, err_buf);
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.user-uid-generate-failed", req->language));
 
         goto cleanup;
     }
+
     uid = (uid % 9000000000ULL) + 1000000000ULL;
 
     /* calloc user_core */
     user_core = calloc(1, sizeof(user_core_t));
     if (!user_core)
     {
-        logger_error("auth_create_handler_v2 req={%s}: calloc failed for user_core_t", ctx->x_req_id);
+        logger_error("auth_create_handler_v2 req={%s}: calloc failed for user_core_t", req->request_id);
 
-        fprintf(stderr, "calloc failed\n");
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.something-went-wrong", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
 
         goto cleanup;
     }
@@ -361,10 +278,9 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     user_profile = calloc(1, sizeof(user_profile_t));
     if (!user_profile)
     {
-        logger_error("auth_create_handler_v2 req={%s}: calloc failed for user_profile_t", ctx->x_req_id);
+        logger_error("auth_create_handler_v2 req={%s}: calloc failed for user_profile_t", req->request_id);
 
-        fprintf(stderr, "calloc failed\n");
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.something-went-wrong", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
 
         goto cleanup;
     }
@@ -377,10 +293,9 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     user_profile_access = calloc(1, sizeof(user_profile_access_t));
     if (!user_profile_access)
     {
-        logger_error("auth_create_handler_v2 req={%s}: calloc failed for user_profile_access_t", ctx->x_req_id);
+        logger_error("auth_create_handler_v2 req={%s}: calloc failed for user_profile_access_t", req->request_id);
 
-        fprintf(stderr, "calloc failed\n");
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.something-went-wrong", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
 
         goto cleanup;
     }
@@ -393,15 +308,13 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     user_active = calloc(1, sizeof(user_active_t));
     if (!user_active)
     {
-        logger_error("auth_create_handler_v2 req={%s}: calloc failed for user_active_t", ctx->x_req_id);
+        logger_error("auth_create_handler_v2 req={%s}: calloc failed for user_active_t", req->request_id);
 
-        fprintf(stderr, "calloc failed\n");
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.something-went-wrong", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
 
         goto cleanup;
     }
     user_active->user_uid = uid;
-
 
     db_result_t user_db_result = db_user_create(http_server->conn, user_core, user_profile, user_profile_access, user_active);
 
@@ -418,21 +331,25 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 
     free(user_profile_access);
     user_profile_access = NULL;
+
     free(user_active);
     user_active = NULL;
 
     switch (user_db_result)
     {
+    case DB_OK:
+        break;
+
     case DB_TIMEOUT:
-        *res = cHTTPX_ResJson(cHTTPX_StatusConnectionTimedOut, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.database-connection-timeout", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusConnectionTimedOut, cHTTPX_i18n_t("error.database-connection-timeout", req->language));
         goto cleanup;
 
     case DB_DUPLICATE:
-        *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.repeating-data-request", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.repeating-data-request", req->language));
         goto cleanup;
 
     case DB_ERROR:
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.perform-database-operation", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
         goto cleanup;
     }
 
@@ -441,30 +358,13 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     session_id = redis_session_create(&session);
     if (!session_id)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.session-creation-error", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.session-creation-error", req->language));
         goto cleanup;
     }
 
-    char* safe_session = escape_json_string(session_id);
-    if (safe_session)
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusCreated, "{\"message\": \"%s\"}", safe_session);
-        free(safe_session);
-    }
-    else
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.session-creation-error", ctx->lang));
-    }
+    *res = cHTTPX_ResMessage(cHTTPX_StatusCreated, session_id);
 
 cleanup:
-    /* Free payloads */
-    free(payload.name);
-    free(payload.username);
-    free(payload.email);
-
-    if (payload.password)
-        free(payload.password);
-
     if (password_hash)
         free(password_hash);
 
@@ -490,45 +390,30 @@ cleanup:
 
     if (session_id)
         free(session_id);
-
-    return;
-
-errorjson:
-    *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", req->error_msg);
-
-    goto cleanup;
 }
 
 void auth_verify_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
-    auth_token_t* ctx = (auth_token_t*)req->context;
-
     /* Initial session id */
     char* session_id = NULL;
 
     auth_verify_t payload = {0};
 
     chttpx_validation_t fields[] = {
-        chttpx_validation_string("email", &payload.email, true, 5, 254, VALIDATOR_EMAIL),
-        chttpx_validation_integer("code", &payload.code, true),
-    };
+		cHTTPX_StringField("email", &payload.email, true, 5, 254, CHTTPX_TRIM | CHTTPX_LOWERCASE, validate_email),
+        chttpx_validation_integer("code", &payload.code,true),
+	};
 
     /* DB. get user core */
     user_core_t* user = NULL;
 
-    if (!cHTTPX_Parse(req, fields, (sizeof(fields) / sizeof(fields[0]))))
-        goto errorjson;
-
-    if (!cHTTPX_Validate(req, fields, (sizeof(fields) / sizeof(fields[0])), ctx->lang))
-        goto errorjson;
-
-    trim_space(payload.email);
-    to_lower(payload.email);
+    if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))
+        return;
 
     int code;
     if (!redis_verifycode_get(payload.email, &code) || payload.code != code)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.invalid-confirmation-code", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.invalid-confirmation-code", req->language));
         goto cleanup;
     }
 
@@ -536,7 +421,7 @@ void auth_verify_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     if (!user || (user->password && user->password[0] != '\0'))
     {
         redis_mark_email_confirmed(payload.email);
-        *res = cHTTPX_ResJson(cHTTPX_StatusAccepted, "{\"message\": \"%s\"}", user ? "password-required" : "registration-required");
+        *res = cHTTPX_ResMessage(cHTTPX_StatusAccepted, user ? "password-required" : "registration-required");
         goto cleanup;
     }
 
@@ -545,63 +430,51 @@ void auth_verify_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     session_id = redis_session_create(&session);
     if (!session_id)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.session-creation-error", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.session-creation-error", req->language));
         goto cleanup;
     }
 
-    char* safe_session = escape_json_string(session_id);
-    if (safe_session)
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusOK, "{\"message\": \"%s\"}", safe_session);
-        free(safe_session);
-    }
-    else
-    {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.session-creation-error", ctx->lang));
-    }
+    *res = cHTTPX_ResMessage(cHTTPX_StatusOK, session_id);
 
 cleanup:
-    /* Free payloads */
-    free(payload.email);
-
     if (user)
     {
         free(user->email);
         free(user->password);
         free(user);
-        user = NULL;
     }
 
     if (session_id)
         free(session_id);
-
-    return;
-
-errorjson:
-    *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", req->error_msg);
-
-    goto cleanup;
 }
 
 void auth_delete_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
-    auth_token_t* ctx = (auth_token_t*)req->context;
+    auth_token_t* ctx = cHTTPX_ContextGet(req, AUTH_CONTEXT_NAME);
+	if (!ctx || !ctx->user)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
+        return;
+    }
 
     db_result_t user_del_db_result = db_user_del_by_uid(http_server->conn, ctx->user->user_uid);
 
     switch (user_del_db_result)
     {
+    case DB_OK:
+        break;
+
     case DB_TIMEOUT:
-        *res = cHTTPX_ResJson(cHTTPX_StatusConnectionTimedOut, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.database-connection-timeout", ctx->lang));
-        goto cleanup;
+        *res = cHTTPX_ResError(cHTTPX_StatusConnectionTimedOut, cHTTPX_i18n_t("error.database-connection-timeout", req->language));
+        return;
 
     case DB_DUPLICATE:
-        *res = cHTTPX_ResJson(cHTTPX_StatusBadRequest, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.repeating-data-request", ctx->lang));
-        goto cleanup;
+        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.repeating-data-request", req->language));
+        return;
 
     case DB_ERROR:
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.perform-database-operation", ctx->lang));
-        goto cleanup;
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
+        return;
     }
 
     /* DELETE AVATAR S3 */
@@ -616,13 +489,9 @@ void auth_delete_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     /* save to s3 storage */
     if (s3_delete_file(ctx->user->avatar, &s3_config) != 0)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusConflict, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.s3-cloud", ctx->lang));
-        goto cleanup;
+        *res = cHTTPX_ResError(cHTTPX_StatusConflict, cHTTPX_i18n_t("error.s3-cloud", req->language));
+        return;
     }
 
-    *res = cHTTPX_ResJson(cHTTPX_StatusOK, "{\"message\": \"%s\"}", cHTTPX_i18n_t("user-deleted", ctx->lang));
-
-cleanup:
-
-    return;
+    *res = cHTTPX_ResMessage(cHTTPX_StatusOK, cHTTPX_i18n_t("user-deleted", req->language));
 }

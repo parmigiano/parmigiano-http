@@ -32,7 +32,11 @@ int verify_password(const char *password, const char *hash);
 int env_init(const char* filename);
 
 /* validation.c */
-bool is_simple_password(const char *password);
+// bool is_simple_password(const char *password);
+bool validate_password(const void* value, char* error, size_t error_size);
+bool validate_email(const void* value, char* error, size_t error_size);
+bool validate_username(const void* value, char* error, size_t error_size);
+bool validate_name(const void* value, char* error, size_t error_size);
 
 /* email.c */
 int send_email_async(const char* to, const char* subject, const char* body, const char* cc);

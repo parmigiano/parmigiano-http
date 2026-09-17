@@ -2,12 +2,14 @@
 
 void swagger_json_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
+    (void)req;
     *res = cHTTPX_ResFile(cHTTPX_StatusOK, cHTTPX_CTYPE_JSON, "docs/swagger/swagger_v2.json");
     return;
 }
 
 void swagger_gui_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
+    (void)req;
     const char* base_addr = getenv("SERVER_BASE_ADDR");
     if (!base_addr || base_addr[0] == '\0')
         base_addr = "http://localhost:8080/api";
@@ -41,6 +43,6 @@ void swagger_gui_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
              "</html>\n",
              url);
 
-    *res = cHTTPX_ResHtml(cHTTPX_StatusOK, swagger_html);
+    *res = cHTTPX_ResHtml(cHTTPX_StatusOK, "%s", swagger_html);
     return;
 }

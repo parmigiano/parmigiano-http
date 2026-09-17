@@ -7,21 +7,11 @@
 
 chttpx_middleware_result_t email_confirmed_middleware(chttpx_request_t* req, chttpx_response_t* res)
 {
-    if (strstr(req->path, "auth/login") != NULL || strstr(req->path, "auth/create") != NULL || strstr(req->path, "auth/verify") != NULL ||
-        strstr(req->path, "doc.api/swagger") != NULL)
-    {
-        return next;
-    }
-
-    auth_token_t* ctx = (auth_token_t*)req->context;
-    if (!ctx->lang)
-    {
-        ctx->lang = strdup(LANGUAGE_BASE);
-    }
+    auth_token_t* ctx = cHTTPX_ContextGet(req, AUTH_CONTEXT_NAME);
 
     if (!ctx || !ctx->user || !ctx->user->email_confirm)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusForbidden, "{\"error\": \"%s\"}", cHTTPX_i18n_t("error.confirm-email", ctx->lang));
+        *res = cHTTPX_ResError(cHTTPX_StatusForbidden, cHTTPX_i18n_t("error.confirm-email", req->language));
         return out;
     }
 

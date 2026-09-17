@@ -18,7 +18,7 @@ RUN set -eux; \
             libpq-dev libmaxminddb-dev \
             libhiredis-dev libcurl4-openssl-dev libssl-dev \
             libargon2-dev uuid-dev libcjson-dev pkg-config \
-            libxml2-dev && \
+            libxml2-dev librabbitmq-dev && \
         break || { [ "$i" -lt 3 ] || exit 1; sleep 10; }; \
     done; \
     rm -rf /var/lib/apt/lists/*
@@ -64,7 +64,7 @@ RUN set -eux; \
         apt-get install -y --no-install-recommends \
             libpq5 libcurl4 libssl3 libargon2-1 \
             libuuid1 libmaxminddb0 \
-            libicu72 libxml2 libcjson1 libhiredis0.14 && \
+            libicu72 libxml2 libcjson1 libhiredis0.14 librabbitmq4 && \
         break || { [ "$i" -lt 3 ] || exit 1; sleep 10; }; \
     done; \
     rm -rf /var/lib/apt/lists/*

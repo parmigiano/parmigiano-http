@@ -144,12 +144,12 @@ void callback_ai_send_response(const char* result, void* arg)
     char* safe = escape_json_string(result ? result : "");
     if (safe)
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusOK, "{\"message\": \"%s\"}", safe);
+        *res = cHTTPX_ResMessage(cHTTPX_StatusOK, safe);
         free(safe);
     }
     else
     {
-        *res = cHTTPX_ResJson(cHTTPX_StatusInternalServerError, "{\"error\": \"AI response error\"}");
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, "{\"error\": \"AI response error\"}");
     }
 }
 
@@ -223,7 +223,7 @@ char* call_ai_text(const char* prompt)
     CURLcode res = curl_easy_perform(curl);
 
     free(json);
-    
+
     curl_easy_cleanup(curl);
     curl_slist_free_all(headers);
 

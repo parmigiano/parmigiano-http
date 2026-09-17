@@ -47,7 +47,19 @@ chttpx_middleware_result_t pow_ddos_middleware(chttpx_request_t* req, chttpx_res
         char challenge[64];
         generate_challenge(challenge, sizeof(challenge));
 
-        *res = cHTTPX_ResJson(cHTTPX_StatusAccepted, "{\"message\": {\"challenge\": \"%s\", \"difficulty\": %d}}", challenge, difficulty);
+        chttpx_json_t* root = cHTTPX_JsonObject(req);
+        chttpx_json_t* message = cHTTPX_JsonObject(req);
+
+        if (!root || !message || cHTTPX_JsonString(message, "challenge", challenge) != 0 ||
+            cHTTPX_JsonNumber(message, "difficulty", difficulty) != 0 ||
+            cHTTPX_JsonChild(root, "message", message) != 0)
+        {
+            *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError,
+                                   cHTTPX_i18n_t("error.something-went-wrong", req->language));
+            return out;
+        }
+
+        *res = cHTTPX_ResJsonObject(cHTTPX_StatusAccepted, root);
         return out;
     }
 
