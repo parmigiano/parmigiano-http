@@ -6,7 +6,7 @@ on:
       - feat/moderation-pipeline
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-linux:
@@ -40,7 +40,25 @@ jobs:
           sudo ldconfig
 
       - name: Build HTTP service
+        id: build
         working-directory: http-service
         run: |
+          set +e
           make clean
-          make lin
+          make lin > ../moderation-build.log 2>&1
+          status=$?
+          cat ../moderation-build.log
+          echo "status=$status" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Persist compiler output on failure
+        if: steps.build.outputs.status != '0'
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add moderation-build.log
+          if ! git diff --cached --quiet; then
+            git commit -m "ci: capture moderation build failure"
+            git push
+          fi
+          exit 1
