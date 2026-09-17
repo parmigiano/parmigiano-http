@@ -342,7 +342,9 @@ int s3_delete_key(const char* key, s3_config_t* cfg)
 
 int s3_delete_file(const char* url, s3_config_t* cfg)
 {
-    if (!url || !*url || !config_valid(cfg))
+    if (!url || !*url)
+        return 0;
+    if (!config_valid(cfg))
         return 1;
 
     const char* key = url_to_key(url, cfg->bucket);
