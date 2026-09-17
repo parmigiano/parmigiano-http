@@ -51,11 +51,16 @@ void user_upload_avatar_handler_v2(chttpx_request_t* req, chttpx_response_t* res
         return;
     }
 
-    /* Initial URL avatar */
     char* url = NULL;
-    const chttpx_file_t* file = cHTTPX_RequestFile(req);
+    bool remove_uploaded_file = false;
+    s3_config_t s3_config = {0};
 
+    /* Prefer multipart/form-data field `avatar`, keep raw upload compatibility. */
+    const chttpx_file_t* file = cHTTPX_FormFile(req, "avatar");
     if (!file)
+        file = cHTTPX_RequestFile(req);
+
+    if (!file || !file->path || file->size == 0)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.no-data-to-process", req->language));
         return;
@@ -127,7 +132,7 @@ void user_upload_avatar_handler_v2(chttpx_request_t* req, chttpx_response_t* res
         return;
     }
 
-    s3_config_t s3_config = {
+    s3_config = (s3_config_t){
         .endpoint = getenv("S3_ENDPOINT"),
         .bucket = getenv("S3_BUCKET_PUB"),
         .access_key = getenv("S3_ACCESS_KEY"),
@@ -139,8 +144,8 @@ void user_upload_avatar_handler_v2(chttpx_request_t* req, chttpx_response_t* res
     char s3_avatar_key[128];
     snprintf(s3_avatar_key, sizeof(s3_avatar_key), "avatar_user_uid_%" PRIu64, ctx->user->user_uid);
 
-    /* save to s3 storage */
-    url = s3_upload_file_pub(f, file->path, file->content_type, s3_avatar_key, &s3_config);
+    /* file->path is a temporary file without an extension; preserve the original form filename instead. */
+    url = s3_upload_file_pub(f, file->original_name, file->content_type, s3_avatar_key, &s3_config);
     fclose(f);
 
     if (!url || *url == '\0')
@@ -148,6 +153,7 @@ void user_upload_avatar_handler_v2(chttpx_request_t* req, chttpx_response_t* res
         *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.save-file", req->language));
         goto cleanup;
     }
+    remove_uploaded_file = true;
 
     /* update in database */
     db_result_t user_upd_result = db_user_profile_upd_avatar_by_uid(http_server->conn, ctx->user->user_uid, url);
@@ -155,6 +161,7 @@ void user_upload_avatar_handler_v2(chttpx_request_t* req, chttpx_response_t* res
     switch (user_upd_result)
     {
     case DB_OK:
+        remove_uploaded_file = false;
         break;
 
     case DB_TIMEOUT:
@@ -170,13 +177,23 @@ void user_upload_avatar_handler_v2(chttpx_request_t* req, chttpx_response_t* res
         goto cleanup;
     }
 
+    /* The profile already points to the new avatar, so failure to delete the old object is non-fatal. */
+    if (ctx->user->avatar && *ctx->user->avatar && strcmp(ctx->user->avatar, url) != 0)
+    {
+        if (s3_delete_file(ctx->user->avatar, &s3_config) != 0)
+            logger_warn("user_upload_avatar_handler_v2 req={%s}: failed to delete previous avatar", req->request_id);
+    }
+
     *res = cHTTPX_ResMessage(cHTTPX_StatusOK, url);
 
 cleanup:
-    if (url)
-        free(url);
+    if (remove_uploaded_file && url)
+    {
+        if (s3_delete_file(url, &s3_config) != 0)
+            logger_error("user_upload_avatar_handler_v2 req={%s}: failed to rollback S3 avatar upload", req->request_id);
+    }
 
-    return;
+    free(url);
 }
 
 void user_get_profile_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
