@@ -38,7 +38,15 @@ chttpx_middleware_result_t authenticate_middleware(chttpx_request_t* req, chttpx
         return out;
     }
 
-    user_block_t* block = db_user_block_get_active(http_server->conn, user_uid);
+    user_block_t* block = NULL;
+    db_result_t block_result = db_user_block_get_active(http_server->conn, user_uid, &block);
+    if (block_result != DB_OK)
+    {
+        db_user_info_free(user);
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+        return out;
+    }
+
     if (block)
     {
         db_user_block_free(block);
