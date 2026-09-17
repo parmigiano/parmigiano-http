@@ -44,7 +44,8 @@ static inline int64_t parse_pg_days_from_civil(int year, unsigned month, unsigne
     year -= month <= 2;
     const int era = (year >= 0 ? year : year - 399) / 400;
     const unsigned year_of_era = (unsigned)(year - era * 400);
-    const unsigned day_of_year = (153 * (month + (month > 2 ? (unsigned)-3 : 9)) + 2) / 5 + day - 1;
+    const unsigned shifted_month = month > 2 ? month - 3 : month + 9;
+    const unsigned day_of_year = (153 * shifted_month + 2) / 5 + day - 1;
     const unsigned day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
     return (int64_t)era * 146097 + (int64_t)day_of_era - 719468;
 }
@@ -73,37 +74,24 @@ static inline bool parse_pg_bool(const char* s)
     return s && (s[0] == 't' || s[0] == '1');
 }
 
-/* Connection to database */
 PGconn* db_conn(void);
-
-/* Disconnect from database */
 void db_close(PGconn* conn);
-
-/* Started migrations in tables */
 void run_migrations(PGconn* conn);
 
-/* One row SELECT result */
 typedef struct {
     char **columns;
     size_t n_columns;
 } db_row_t;
 
-/* Many SELECT rows */
 typedef struct {
     db_row_t *rows;
     size_t n_rows;
 } db_result_set_t;
 
-/* Exec INSERT/UPDATE/DELETE */
 db_result_t execute_sql(PGconn *conn, const char *query, const char **params, int n_params);
-
-/* Exec SELECT and return many rows in out_result */
 db_result_t execute_select(PGconn *conn, const char *query, const char **params, int n_params, db_result_set_t **out_result);
-
-/* Free SELECT result memory */
 void free_result_set(db_result_set_t *rc);
 
-/* Thread-safe PQexec / PQexecParams wrappers */
 PGresult* db_exec(PGconn* conn, const char* query);
 PGresult* db_exec_params(PGconn* conn, const char* query, int n_params, const char** params);
 
