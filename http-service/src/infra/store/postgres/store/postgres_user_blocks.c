@@ -6,8 +6,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-user_block_t* db_user_block_get_active(PGconn* conn, uint64_t user_uid)
+db_result_t db_user_block_get_active(PGconn* conn, uint64_t user_uid, user_block_t** out_block)
 {
+    if (!conn || !out_block || !user_uid)
+        return DB_ERROR;
+
+    *out_block = NULL;
     db_result_set_t* rc = NULL;
 
     const char* query =
@@ -23,25 +27,25 @@ user_block_t* db_user_block_get_active(PGconn* conn, uint64_t user_uid)
     snprintf(user_uid_str, sizeof(user_uid_str), "%lu", user_uid);
 
     const char* params[1] = {user_uid_str};
-
-    if (execute_select(conn, query, params, 1, &rc) != DB_OK)
+    db_result_t result = execute_select(conn, query, params, 1, &rc);
+    if (result != DB_OK)
     {
         logger_error("db_user_block_get_active user_uid={%lu}: failed to exec sql: %s", user_uid, PQerrorMessage(conn));
         free_result_set(rc);
-        return NULL;
+        return result;
     }
 
     if (!rc || rc->n_rows == 0)
     {
         free_result_set(rc);
-        return NULL;
+        return DB_OK;
     }
 
     user_block_t* block = calloc(1, sizeof(*block));
     if (!block)
     {
         free_result_set(rc);
-        return NULL;
+        return DB_ERROR;
     }
 
     block->id = strtoull(rc->rows[0].columns[0], NULL, 10);
@@ -53,7 +57,8 @@ user_block_t* db_user_block_get_active(PGconn* conn, uint64_t user_uid)
     block->blocked_by_uid = rc->rows[0].columns[5][0] == '\0' ? 0 : strtoull(rc->rows[0].columns[5], NULL, 10);
 
     free_result_set(rc);
-    return block;
+    *out_block = block;
+    return DB_OK;
 }
 
 db_result_t db_user_block_create(PGconn* conn,
