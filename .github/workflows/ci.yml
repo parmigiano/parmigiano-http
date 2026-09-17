@@ -8,43 +8,123 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  docker-build:
-    name: Docker build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build image
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: false
-          load: true
-          tags: parmigiano-http:ci
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
   static-analysis:
     name: Static analysis (cppcheck)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Install cppcheck
-        run: sudo apt update && sudo apt install -y cppcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cppcheck
 
       - name: Run cppcheck
+        working-directory: http-service
         run: |
           cppcheck \
+            --std=c11 \
             --enable=warning,performance,portability \
             --suppress=missingIncludeSystem \
             --inline-suppr \
-            -I include \
             --error-exitcode=1 \
+            -I include \
             src/ include/
+
+  repository-validation:
+    name: Repository validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Validate JSON files
+        run: |
+          python3 -m json.tool http-service/src/infra/locale/en.json >/dev/null
+          python3 -m json.tool http-service/src/infra/locale/ru.json >/dev/null
+          python3 -m json.tool http-service/docs/swagger/swagger_v2.json >/dev/null
+
+      - name: Check for committed secrets and build artifacts
+        run: |
+          if git ls-files | grep -E '(^|/)(\.env|\.env\..+|.*\.(pem|key|p12|pfx))$' | grep -v -E '(^|/)\.env\.example$'; then
+            echo "Sensitive environment/key file is tracked by git"
+            exit 1
+          fi
+
+          if git ls-files | grep -E '(^|/)(\.out|\.build)/'; then
+            echo "Build artifacts are tracked by git"
+            exit 1
+          fi
+
+  migration-policy:
+    name: Migration policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Validate migration names and sequence
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          dir="http-service/src/infra/store/postgres/migrations"
+          mapfile -t migrations < <(find "$dir" -maxdepth 1 -type f -name '*.sql' -printf '%f\n' | sort)
+
+          if (( ${#migrations[@]} == 0 )); then
+            echo "No migrations found"
+            exit 1
+          fi
+
+          expected=1
+          for migration in "${migrations[@]}"; do
+            if [[ ! "$migration" =~ ^([0-9]{3})_[a-z0-9_]+\.sql$ ]]; then
+              echo "Invalid migration filename: $migration"
+              exit 1
+            fi
+
+            version=$((10#${BASH_REMATCH[1]}))
+            if (( version != expected )); then
+              printf 'Migration sequence error: expected %03d, got %03d (%s)\n' "$expected" "$version" "$migration"
+              exit 1
+            fi
+
+            if [[ ! -s "$dir/$migration" ]]; then
+              echo "Empty migration: $migration"
+              exit 1
+            fi
+
+            ((expected += 1))
+          done
+
+      - name: Prevent editing applied migration history
+        if: github.event_name == 'pull_request'
+        shell: bash
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -euo pipefail
+
+          migration_dir="http-service/src/infra/store/postgres/migrations/"
+          git fetch origin "$BASE_REF" --depth=1
+
+          changed_existing=$(git diff --name-status "origin/$BASE_REF...HEAD" -- "$migration_dir" | awk '$1 !~ /^A/ {print}')
+          if [[ -n "$changed_existing" ]]; then
+            echo "Existing migrations are immutable. Add a new migration instead:"
+            echo "$changed_existing"
+            exit 1
+          fi
