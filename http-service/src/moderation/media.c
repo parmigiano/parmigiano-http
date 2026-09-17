@@ -30,7 +30,6 @@
 #endif
 
 #define MODERATION_MAX_DOWNLOAD_BYTES (500ULL * 1024ULL * 1024ULL)
-#define MODERATION_FRAME_COUNT 6
 #define MODERATION_PROCESS_TIMEOUT_SEC 20
 
 typedef struct {
@@ -225,6 +224,17 @@ static int create_temp_dir(char* path, size_t path_size)
 #endif
 }
 
+static void remove_temp_dir(const char* path)
+{
+    if (!path)
+        return;
+#ifdef _WIN32
+    _rmdir(path);
+#else
+    rmdir(path);
+#endif
+}
+
 static int run_process(char* const argv[])
 {
 #ifdef _WIN32
@@ -298,12 +308,12 @@ static const char* infer_mime(const char* reference)
 }
 
 static moderation_media_result_t download_target(const moderation_target_t* target,
-                                                 char* path,
-                                                 size_t path_size,
-                                                 char* mime,
-                                                 size_t mime_size,
-                                                 char* detail,
-                                                 size_t detail_size)
+                                                  char* path,
+                                                  size_t path_size,
+                                                  char* mime,
+                                                  size_t mime_size,
+                                                  char* detail,
+                                                  size_t detail_size)
 {
     if (!target || !target->content_ref || !path || !mime)
         return MODERATION_MEDIA_ERROR;
@@ -397,7 +407,10 @@ static moderation_media_result_t download_target(const moderation_target_t* targ
     return MODERATION_MEDIA_CLEAN;
 }
 
-static moderation_media_result_t map_nsfw_result(nsfw_result_t result, const nsfw_error_t* error, char* detail, size_t detail_size)
+static moderation_media_result_t map_nsfw_result(nsfw_result_t result,
+                                                  const nsfw_error_t* error,
+                                                  char* detail,
+                                                  size_t detail_size)
 {
     if (result == NSFW_OK)
         return MODERATION_MEDIA_CLEAN;
@@ -429,16 +442,19 @@ static moderation_media_result_t scan_frame(const char* path, char* detail, size
     return map_nsfw_result(result, &error, detail, detail_size);
 }
 
-static moderation_media_result_t normalize_and_scan_image(const char* input, char* detail, size_t detail_size)
+static moderation_media_result_t normalize_and_scan_image(const char* input,
+                                                           char* detail,
+                                                           size_t detail_size)
 {
-    char output[512];
-    FILE* placeholder = NULL;
-    if (create_temp_file(output, sizeof(output), &placeholder) != 0)
+    char directory[512];
+    if (create_temp_dir(directory, sizeof(directory)) != 0)
     {
-        snprintf(detail, detail_size, "failed to create image normalization file");
+        snprintf(detail, detail_size, "failed to create image normalization directory");
         return MODERATION_MEDIA_RETRY;
     }
-    fclose(placeholder);
+
+    char output[640];
+    snprintf(output, sizeof(output), "%s/image.jpg", directory);
 
     char* argv[] = {
         "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
@@ -453,16 +469,20 @@ static moderation_media_result_t normalize_and_scan_image(const char* input, cha
     if (run_process(argv) != 0)
     {
         remove(output);
+        remove_temp_dir(directory);
         snprintf(detail, detail_size, "ffmpeg could not decode image");
         return MODERATION_MEDIA_INVALID;
     }
 
     moderation_media_result_t result = scan_frame(output, detail, detail_size);
     remove(output);
+    remove_temp_dir(directory);
     return result;
 }
 
-static moderation_media_result_t extract_and_scan_frames(const char* input, char* detail, size_t detail_size)
+static moderation_media_result_t extract_and_scan_frames(const char* input,
+                                                          char* detail,
+                                                          size_t detail_size)
 {
     char directory[512];
     if (create_temp_dir(directory, sizeof(directory)) != 0)
@@ -552,17 +572,13 @@ cleanup:
             remove(frame);
         }
     }
-#ifdef _WIN32
-    _rmdir(directory);
-#else
-    rmdir(directory);
-#endif
+    remove_temp_dir(directory);
     return final_result;
 }
 
 moderation_media_result_t moderation_media_scan(const moderation_target_t* target,
-                                                char* detail,
-                                                size_t detail_size)
+                                                 char* detail,
+                                                 size_t detail_size)
 {
     if (!target || !detail || detail_size == 0)
         return MODERATION_MEDIA_ERROR;
