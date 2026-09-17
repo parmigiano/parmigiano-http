@@ -17,6 +17,14 @@ CREATE TABLE IF NOT EXISTS moderation_violations (
         UNIQUE (target_type, target_id, content_fingerprint)
 );
 
+CREATE TABLE IF NOT EXISTS moderation_user_stats (
+    user_uid BIGINT PRIMARY KEY REFERENCES user_cores(user_uid) ON DELETE CASCADE,
+    violation_count BIGINT NOT NULL DEFAULT 0,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT chk_moderation_user_stats_count CHECK (violation_count >= 0)
+);
+
 CREATE INDEX IF NOT EXISTS idx_moderation_violations_user_created
     ON moderation_violations (user_uid, created_at DESC);
 
