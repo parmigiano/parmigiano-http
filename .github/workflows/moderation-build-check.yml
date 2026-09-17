@@ -1,0 +1,46 @@
+name: Moderation build check
+
+on:
+  push:
+    branches:
+      - feat/moderation-pipeline
+
+permissions:
+  contents: read
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential git pkg-config \
+            libpq-dev libcurl4-openssl-dev libssl-dev libargon2-dev \
+            uuid-dev libmaxminddb-dev libhiredis-dev libcjson-dev \
+            libxml2-dev librabbitmq-dev
+
+      - name: Build and install libs3
+        run: |
+          git clone --depth 1 https://github.com/bji/libs3.git /tmp/libs3
+          make -C /tmp/libs3
+          sudo make -C /tmp/libs3 install
+          sudo ldconfig
+
+      - name: Build and install libchttpx
+        run: |
+          git clone --depth 1 https://github.com/netcorelink/libchttpx.git /tmp/libchttpx
+          make -C /tmp/libchttpx libchttpx.so
+          sudo make -C /tmp/libchttpx lib-install DESTDIR=
+          sudo ldconfig
+
+      - name: Build HTTP service
+        working-directory: http-service
+        run: |
+          make clean
+          make lin
