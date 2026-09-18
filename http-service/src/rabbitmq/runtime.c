@@ -291,6 +291,9 @@ rmq_result_t rabbitmq_publish_json(
     if (!route)
         return RMQ_NOT_FOUND;
 
+    if (!route->exchange || !*route->exchange || !route->routing_key)
+        return RMQ_INVALID_ARGUMENT;
+
     const char* url = getenv("RABBITMQ_URL");
     if (!url || !*url)
         return RMQ_NOT_CONFIGURED;
