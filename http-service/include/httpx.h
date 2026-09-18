@@ -9,8 +9,10 @@
 
 #include <libpq-fe.h>
 #include <maxminddb.h>
+#include <libchttpx/libchttpx.h>
 
 #define HTTPX_SERVER_PORT 8080
+#define MODERATION_SERVER_PORT 8181
 #define HTTPX_RABBITMQ_WORKERS 1
 
 typedef struct {
@@ -29,6 +31,12 @@ typedef struct {
 } httpx_rabbitmq_worker_t;
 
 typedef struct {
+	chttpx_app_t app;
+	bool app_initialized;
+
+	chttpx_serv_t* http;
+	chttpx_serv_t* moderation;
+
     PGconn* conn;
     MMDB_s geoip;
 

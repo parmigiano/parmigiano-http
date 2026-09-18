@@ -15,13 +15,14 @@ const rabbitmq_route_t* rabbitmq_routes(size_t* count)
     return items;
 }
 
-void routes(void)
+void http_routes(chttpx_serv_t* server)
 {
-    chttpx_router_t api = cHTTPX_RoutePathPrefix("/api/v2");
+    chttpx_router_t api = cHTTPX_RoutePathPrefix(server, "/api/v2");
 
     static const char* image_types[] = {cHTTPX_CTYPE_JPEG, cHTTPX_CTYPE_PNG, cHTTPX_CTYPE_GIF};
     static const char* background_types[] = {cHTTPX_CTYPE_JPEG, cHTTPX_CTYPE_PNG};
 
+	/* Policy */
     static const chttpx_upload_policy_t avatar_policy = {
         .max_size = 10 * 1024 * 1024,
         .allowed_types = image_types,
@@ -87,11 +88,6 @@ void routes(void)
     chttpx_route_t* media_upload_route = cHTTPX_Post(&media, "/chats/{chat_id}/upload", media_upload_in_chat_handler_v2);
     cHTTPX_RouteUploadPolicy(media_upload_route, &media_policy);
 
-    /* Moderation routes */
-    chttpx_router_t moderation = cHTTPX_RouteGroup(&api, "/moderation");
-    cHTTPX_RouterUse(&moderation, authenticate_middleware);
-    cHTTPX_Post(&moderation, "/scan", moderation_wtype_handler_v2);
-
     /* Group chats routes */
     chttpx_router_t group = cHTTPX_RouteGroup(&api, "/groups");
     cHTTPX_RouterUse(&group, authenticate_middleware);
@@ -99,4 +95,14 @@ void routes(void)
     cHTTPX_Post(&group, "", group_chats_create_handler_v2);
     cHTTPX_Put(&group, "/{group_id}", group_chats_edit_handler_v2);
     cHTTPX_Delete(&group, "/{group_id}", group_chats_delete_handler_v2);
+}
+
+void moderation_routes(chttpx_serv_t* server)
+{
+	chttpx_router_t api = cHTTPX_RoutePathPrefix(server, "/api/v2");
+
+	/* Moderation routes */
+    chttpx_router_t moderation = cHTTPX_RouteGroup(&api, "/moderation");
+    cHTTPX_RouterUse(&moderation, authenticate_middleware);
+    cHTTPX_Post(&moderation, "/scan", moderation_wtype_handler_v2);
 }

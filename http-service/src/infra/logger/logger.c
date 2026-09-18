@@ -8,6 +8,7 @@
 #include <string.h>
 #include <pthread.h>
 #include <sys/stat.h>
+#include <libchttpx/libchttpx.h>
 
 #define QUEUE_SIZE 2048
 
@@ -142,4 +143,27 @@ void logger_error(const char* fmt, ...)
     va_start(args, fmt);
     log_with_level("ERROR", "errors.log", fmt, args);
     va_end(args);
+}
+
+void logger_httpx(chttpx_log_level_t level, const char* request_id, const char* message, void* user_data)
+{
+    (void)user_data;
+    const char* id = request_id && request_id[0] ? request_id : "-";
+    const char* text = message ? message : "";
+
+    switch (level)
+    {
+    case CHTTPX_LOG_ERROR:
+        logger_error("libchttpx req={%s}: %s", id, text);
+        break;
+    case CHTTPX_LOG_WARN:
+        logger_warn("libchttpx req={%s}: %s", id, text);
+        break;
+    case CHTTPX_LOG_DEBUG:
+    case CHTTPX_LOG_INFO:
+        logger_info("libchttpx req={%s}: %s", id, text);
+        break;
+    case CHTTPX_LOG_OFF:
+        break;
+    }
 }
