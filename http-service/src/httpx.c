@@ -13,7 +13,7 @@
 #include <curl/curl.h>
 #include <libchttpx/libchttpx.h>
 
-httpx_server_t *http_server = NULL;
+app_context_t *app_context = NULL;
 
 static void _cors(chttpx_serv_t* server);
 static void _http_cleanup(void);
@@ -23,15 +23,15 @@ void http_init(void)
     /* Initial logger */
     logger_init();
 
-	http_server = (httpx_server_t*)calloc(1, sizeof(httpx_server_t));
-    if (!http_server)
+	app_context = (app_context_t*)calloc(1, sizeof(app_context_t));
+    if (!app_context)
     {
-        logger_error("http_init: calloc failed for http_server");
+        logger_error("http_init: calloc failed for app_context");
         fprintf(stderr, "calloc failed\n");
         return;
     }
 
-	chttpx_error_t app_result = cHTTPX_AppInit(&http_server->app);
+	chttpx_error_t app_result = cHTTPX_AppInit(&app_context->app);
 	if (app_result != CHTTPX_OK)
 	{
 		logger_error("http_init: failed to initialize cHTTPX App, error=%d", app_result);
@@ -40,7 +40,7 @@ void http_init(void)
 		_http_cleanup();
 		return;
 	}
-	http_server->app_initialized = true;
+	app_context->app_initialized = true;
 
 	/* Initial HTTP server / Config */
 	static const char* languages[] = {
@@ -63,8 +63,8 @@ void http_init(void)
 	http_config.log_level = CHTTPX_LOG_INFO;
 	http_config.logger = logger_httpx;
 
-	http_server->http = cHTTPX_AppServer(&http_server->app, "http", &http_config);
-	if (!http_server->http)
+	app_context->http = cHTTPX_AppServer(&app_context->app, "http", &http_config);
+	if (!app_context->http)
 	{
 		logger_error("http_init: failed to create http server");
 		fprintf(stderr, "failed to create http server\n");
@@ -90,8 +90,8 @@ void http_init(void)
 	moderation_config.log_level = CHTTPX_LOG_INFO;
 	moderation_config.logger = logger_httpx;
 
-	http_server->moderation = cHTTPX_AppServer(&http_server->app, "moderation", &moderation_config);
-	if (!http_server->moderation)
+	app_context->moderation = cHTTPX_AppServer(&app_context->app, "moderation", &moderation_config);
+	if (!app_context->moderation)
 	{
 		logger_error("http_init: failed to create moderation server");
 		fprintf(stderr, "failed to create moderation server\n");
@@ -112,8 +112,8 @@ void http_init(void)
     }
 
     /* Inital database, migrations */
-    http_server->conn = db_conn();
-    if (!http_server->conn)
+    app_context->conn = db_conn();
+    if (!app_context->conn)
     {
         logger_error("http_init: failed to connect to database");
         fprintf(stderr, "failed to connect to database\n");
@@ -122,10 +122,10 @@ void http_init(void)
 		return;
     }
 
-    run_migrations(http_server->conn);
+    run_migrations(app_context->conn);
 
     /* Load in memory GeoIP */
-    int status = MMDB_open("/usr/local/share/GeoIP/GeoLite2-Country.mmdb", MMDB_MODE_MMAP, &http_server->geoip);
+    int status = MMDB_open("/usr/local/share/GeoIP/GeoLite2-Country.mmdb", MMDB_MODE_MMAP, &app_context->geoip);
     if (status != MMDB_SUCCESS)
     {
         logger_error("http_init: failed load GeoIP in memory: %s", MMDB_strerror(status));
@@ -139,26 +139,26 @@ void http_init(void)
     start_ai_worker();
 
     /* Cors */
-    _cors(http_server->http);
-    _cors(http_server->moderation);
+    _cors(app_context->http);
+    _cors(app_context->moderation);
 
     /* Initial middlewares */
-    cHTTPX_MiddlewareLogging(http_server->http);
-	cHTTPX_MiddlewareLogging(http_server->moderation);
-    cHTTPX_MiddlewareRateLimiter(http_server->http, 5, 1);
-    cHTTPX_MiddlewareUse(http_server->http, geoip_block_middleware);
+    cHTTPX_MiddlewareLogging(app_context->http);
+	cHTTPX_MiddlewareLogging(app_context->moderation);
+    cHTTPX_MiddlewareRateLimiter(app_context->http, 5, 1);
+    cHTTPX_MiddlewareUse(app_context->http, geoip_block_middleware);
     // cHTTPX_MiddlewareUse(email_confirmed_middleware);
 
     /* Initial routes */
-    http_routes(http_server->http);
-    moderation_routes(http_server->moderation);
+    http_routes(app_context->http);
+    moderation_routes(app_context->moderation);
 
-    if (!rabbitmq_runtime_start(&http_server->rabbitmq))
+    if (!rabbitmq_runtime_start(&app_context->rabbitmq))
     {
         logger_error("Failed to start RabbitMQ runtime");
     }
 
-    int run_result = cHTTPX_AppRun(&http_server->app);
+    int run_result = cHTTPX_AppRun(&app_context->app);
 	if (run_result != CHTTPX_OK)
 	{
 		logger_error("http_init: cHTTPX_AppRun failed, error=%d", run_result);
@@ -169,29 +169,29 @@ void http_init(void)
 
 static void _http_cleanup(void)
 {
-	if (!http_server)
+	if (!app_context)
 		return;
 
 	/* RabbitMQ */
-    rabbitmq_runtime_stop(http_server->rabbitmq);
-    http_server->rabbitmq = NULL;
+    rabbitmq_runtime_stop(app_context->rabbitmq);
+    app_context->rabbitmq = NULL;
 
-	if (http_server->app_initialized)
+	if (app_context->app_initialized)
 	{
-		cHTTPX_AppShutdown(&http_server->app);
+		cHTTPX_AppShutdown(&app_context->app);
 
-		http_server->app_initialized = false;
-		http_server->http = NULL;
+		app_context->app_initialized = false;
+		app_context->http = NULL;
 	}
 
 	/* Free mmdb GeoIP */
-    MMDB_close(&http_server->geoip);
+    MMDB_close(&app_context->geoip);
 
 	/* PostgreSQL */
-	if (http_server->conn)
+	if (app_context->conn)
     {
-        db_close(http_server->conn);
-        http_server->conn = NULL;
+        db_close(app_context->conn);
+        app_context->conn = NULL;
     }
 
 	/* Redis */
@@ -200,8 +200,8 @@ static void _http_cleanup(void)
 	/* Free CURL */
     curl_global_cleanup();
 
-    free(http_server);
-    http_server = NULL;
+    free(app_context);
+    app_context = NULL;
 }
 
 static void _cors(chttpx_serv_t* server)
