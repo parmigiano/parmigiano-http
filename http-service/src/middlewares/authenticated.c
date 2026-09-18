@@ -4,6 +4,7 @@
 #include "handlers.h"
 #include "redis/redis_session.h"
 #include "postgres/postgres_users.h"
+#include "postgres/postgres_user_blocks.h"
 
 #include <stdlib.h>
 #include <libchttpx/libchttpx.h>
@@ -25,9 +26,9 @@ chttpx_middleware_result_t authenticate_middleware(chttpx_request_t* req, chttpx
         return out;
     }
 
-	uint64_t user_uid = session->user_uid;
+    uint64_t user_uid = session->user_uid;
 
-	free(session);
+    free(session);
     session = NULL;
 
     user_info_t* user = db_user_info_get_by_uid(http_server->conn, user_uid);
@@ -37,24 +38,42 @@ chttpx_middleware_result_t authenticate_middleware(chttpx_request_t* req, chttpx
         return out;
     }
 
-	if (cHTTPX_Defer(req, user, (chttpx_cleanup_fn)db_user_info_free) != 0)
-	{
-		db_user_info_free(user);
-		*res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
-
+    user_block_t* block = NULL;
+    db_result_t block_result = db_user_block_get_active(http_server->conn, user_uid, &block);
+    if (block_result != DB_OK)
+    {
+        db_user_info_free(user);
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
         return out;
-	}
+    }
+
+    if (block)
+    {
+        db_user_block_free(block);
+        db_user_info_free(user);
+
+        /* Do not refresh a blocked user's session TTL. */
+        *res = cHTTPX_ResError(cHTTPX_StatusForbidden, "account is blocked");
+        return out;
+    }
+
+    if (cHTTPX_Defer(req, user, (chttpx_cleanup_fn)db_user_info_free) != 0)
+    {
+        db_user_info_free(user);
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+        return out;
+    }
 
     auth_token_t* ctx = cHTTPX_Alloc(req, sizeof(*ctx));
-	if (!ctx)
-	{
-		*res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+    if (!ctx)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
         return out;
-	}
+    }
 
-	ctx->user = user;
+    ctx->user = user;
 
-	if (cHTTPX_ContextSet(req, AUTH_CONTEXT_NAME, ctx, NULL) != 0)
+    if (cHTTPX_ContextSet(req, AUTH_CONTEXT_NAME, ctx, NULL) != 0)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
         return out;

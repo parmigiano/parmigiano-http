@@ -8,6 +8,10 @@
 /* QUEUEs */
 #define MODERATION_QUEUE   "moderation.data"
 
+/* Moderation route */
+#define MODERATION_EXCHANGE    "moderation"
+#define MODERATION_ROUTING_KEY "moderation.scan"
+
 typedef struct rmq_client rmq_client_t;
 
 typedef enum {

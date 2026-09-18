@@ -74,7 +74,7 @@ db_result_t db_group_chat_add_chats(PGconn* conn, uint64_t user_uid, uint64_t gr
 
     for (size_t i = 0; i < chat_size; i++)
     {
-        int written = snprintf(chats_array + offset, sizeof(chats_array) - offset, "%s%u", (i == 0 ? "" : ","), chat_ids[i]);
+        int written = snprintf(chats_array + offset, sizeof(chats_array) - offset, "%s%d", (i == 0 ? "" : ","), chat_ids[i]);
 
         if (written < 0 || (size_t)written >= sizeof(chats_array) - offset)
             return DB_ERROR;
@@ -151,7 +151,7 @@ db_result_t db_group_chat_edit_chats_by_group_id(PGconn* conn, uint64_t group_id
 
     for (size_t i = 0; i < chat_size; i++)
     {
-        int written = snprintf(chats_array + offset, sizeof(chats_array) - offset, "%s%u", (i == 0 ? "" : ","), chat_ids[i]);
+        int written = snprintf(chats_array + offset, sizeof(chats_array) - offset, "%s%d", (i == 0 ? "" : ","), chat_ids[i]);
 
         if (written < 0 || (size_t)written >= sizeof(chats_array) - offset)
             return DB_ERROR;

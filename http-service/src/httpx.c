@@ -277,7 +277,7 @@ static void *rabbitmq_worker_main(void *arg)
         .url = worker->url,
         .connect_timeout_ms = 3000,
         .rpc_timeout_ms = 5000,
-        .heartbeat_seconds = 30,
+        .heartbeat_seconds = 180,
         .tls_ca_file = NULL
     };
 

@@ -51,6 +51,7 @@ void group_chats_edit_handler_v2(chttpx_request_t* req, chttpx_response_t* res);
 void group_chats_delete_handler_v2(chttpx_request_t* req, chttpx_response_t* res);
 
 /* Moderation handlers */
+void moderation_wtype_handler_v2(chttpx_request_t* req, chttpx_response_t* res);
 rmq_action_t moderation_data_handler_v2(const rmq_message_t *message, void *userdata);
 
 #endif

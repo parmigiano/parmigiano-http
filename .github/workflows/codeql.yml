@@ -13,50 +13,26 @@ permissions:
   contents: read
   security-events: write
 
+concurrency:
+  group: codeql-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   analyze:
-    name: Analyze (${{ matrix.language }})
+    name: Analyze (C/C++)
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [cpp]
+    timeout-minutes: 20
+
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
-          languages: ${{ matrix.language }}
-
-      - name: Install build dependencies
-        run: |
-          sudo apt update
-          sudo apt install -y gcc make git wget \
-            postgresql-server-dev-all libmaxminddb-dev \
-            libhiredis-dev libcurl4-openssl-dev libssl-dev \
-            libargon2-dev uuid-dev libcjson-dev pkg-config
-
-      - name: Install libchttpx from Docker image
-        run: |
-          docker pull noneandundefined/libchttpx:latest
-          cid=$(docker create noneandundefined/libchttpx:latest)
-          docker cp "$cid:/usr/local/lib/libchttpx.so" /usr/local/lib/
-          docker cp "$cid:/usr/local/lib/pkgconfig/libchttpx.pc" /usr/local/lib/pkgconfig/
-          docker cp "$cid:/usr/local/include/libchttpx" /usr/local/include/
-          docker rm "$cid"
-          sudo ldconfig
-
-      - name: Build libs3
-        run: |
-          git clone --depth 1 https://github.com/bji/libs3.git /tmp/libs3
-          make -C /tmp/libs3
-          sudo make -C /tmp/libs3 install
-          sudo ldconfig
-
-      - name: Build
-        run: make lin
+          languages: cpp
+          build-mode: none
+          queries: security-extended
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
