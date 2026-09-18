@@ -21,7 +21,7 @@ chttpx_middleware_result_t geoip_block_middleware(chttpx_request_t* req, chttpx_
 
     int gai_error, mmdb_error;
 
-    MMDB_lookup_result_s result = MMDB_lookup_string(&http_server->geoip, ip, &gai_error, &mmdb_error);
+    MMDB_lookup_result_s result = MMDB_lookup_string(&app_context->geoip, ip, &gai_error, &mmdb_error);
     if (gai_error != 0 || mmdb_error != MMDB_SUCCESS || !result.found_entry)
     {
         return next;
