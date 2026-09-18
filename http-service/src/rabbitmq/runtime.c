@@ -188,6 +188,13 @@ bool rabbitmq_runtime_start(rabbitmq_runtime_t** out)
         return true;
     }
 
+    size_t worker_count = 0;
+    for (size_t i = 0; i < route_count; ++i)
+    {
+        if (routes[i].handler && routes[i].queue && *routes[i].queue)
+            worker_count++;
+    }
+
     rabbitmq_runtime_t* runtime = calloc(1, sizeof(*runtime));
     if (!runtime)
         return false;
@@ -195,18 +202,22 @@ bool rabbitmq_runtime_start(rabbitmq_runtime_t** out)
     atomic_init(&runtime->stop, false);
 
     runtime->url = strdup(url);
-    runtime->workers = calloc(route_count, sizeof(*runtime->workers));
-    runtime->worker_count = route_count;
+    runtime->workers = worker_count ? calloc(worker_count, sizeof(*runtime->workers)) : NULL;
+    runtime->worker_count = worker_count;
 
-    if (!runtime->url || !runtime->workers)
+    if (!runtime->url || (worker_count && !runtime->workers))
     {
         rabbitmq_runtime_stop(runtime);
         return false;
     }
 
+    size_t worker_index = 0;
     for (size_t i = 0; i < route_count; ++i)
     {
-        rabbitmq_worker_t* worker = &runtime->workers[i];
+        if (!routes[i].handler || !routes[i].queue || !*routes[i].queue)
+            continue;
+
+        rabbitmq_worker_t* worker = &runtime->workers[worker_index++];
 
         worker->route = &routes[i];
         worker->url = runtime->url;
@@ -277,7 +288,7 @@ rmq_result_t rabbitmq_publish_json(
         return RMQ_INVALID_ARGUMENT;
 
     const rabbitmq_route_t* route = rabbitmq_route_get(route_id);
-    if (!channel)
+    if (!route)
         return RMQ_NOT_FOUND;
 
     const char* url = getenv("RABBITMQ_URL");
