@@ -17,7 +17,7 @@ const rabbitmq_route_t* rabbitmq_routes(size_t* count)
 
 void routes(void)
 {
-	chttpx_router_t api = cHTTPX_RoutePathPrefix("/api/v2");
+    chttpx_router_t api = cHTTPX_RoutePathPrefix("/api/v2");
 
     static const char* image_types[] = {cHTTPX_CTYPE_JPEG, cHTTPX_CTYPE_PNG, cHTTPX_CTYPE_GIF};
     static const char* background_types[] = {cHTTPX_CTYPE_JPEG, cHTTPX_CTYPE_PNG};
@@ -37,7 +37,7 @@ void routes(void)
     };
 
     /* Swagger routes */
-	chttpx_router_t doc = cHTTPX_RouteGroup(&api, "/doc.api");
+    chttpx_router_t doc = cHTTPX_RouteGroup(&api, "/doc.api");
 
     cHTTPX_Get(&doc, "/swagger/json", swagger_json_handler_v2);
     cHTTPX_Get(&doc, "/swagger/gui", swagger_gui_handler_v2);
@@ -51,7 +51,7 @@ void routes(void)
     cHTTPX_Post(&auth, "/verify", auth_verify_handler_v2);
 
     chttpx_route_t* auth_logout_route = cHTTPX_Post(&auth, "/logout", auth_logout_handler_v2);
-	cHTTPX_RouteUse(auth_logout_route, authenticate_middleware);
+    cHTTPX_RouteUse(auth_logout_route, authenticate_middleware);
     chttpx_route_t* auth_delete_account_route = cHTTPX_Delete(&auth, "/delete", auth_delete_handler_v2);
     cHTTPX_RouteUse(auth_delete_account_route, authenticate_middleware);
 
@@ -61,7 +61,7 @@ void routes(void)
 
     cHTTPX_Get(&user, "/me", user_me_handler_v2);
     cHTTPX_Patch(&user, "/me", user_update_profile_handler_v2);
-	cHTTPX_Get(&user, "/{user_uid}", user_get_profile_handler_v2);
+    cHTTPX_Get(&user, "/{user_uid}", user_get_profile_handler_v2);
 
     chttpx_route_t* user_avatar_route = cHTTPX_Patch(&user, "/me/avatar", user_upload_avatar_handler_v2);
     cHTTPX_RouteUploadPolicy(user_avatar_route, &avatar_policy);
@@ -70,7 +70,6 @@ void routes(void)
     chttpx_router_t chat = cHTTPX_RouteGroup(&api, "/chats");
     cHTTPX_RouterUse(&chat, authenticate_middleware);
 
-    /* /chats?offset=0 */
     cHTTPX_Get(&chat, "", chat_get_my_history_handler_v2);
     cHTTPX_Get(&chat, "/u/{username}", chat_get_by_username_handler_v2);
     cHTTPX_Get(&chat, "/{chat_id}", chat_get_settings_handler_v2);
@@ -87,6 +86,11 @@ void routes(void)
 
     chttpx_route_t* media_upload_route = cHTTPX_Post(&media, "/chats/{chat_id}/upload", media_upload_in_chat_handler_v2);
     cHTTPX_RouteUploadPolicy(media_upload_route, &media_policy);
+
+    /* Moderation routes */
+    chttpx_router_t moderation = cHTTPX_RouteGroup(&api, "/moderation");
+    cHTTPX_RouterUse(&moderation, authenticate_middleware);
+    cHTTPX_Post(&moderation, "/scan", moderation_wtype_handler_v2);
 
     /* Group chats routes */
     chttpx_router_t group = cHTTPX_RouteGroup(&api, "/groups");
