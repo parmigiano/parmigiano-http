@@ -183,7 +183,7 @@ static rmq_result_t publish_moderation_task(const moderation_task_t* task,
         return RMQ_OUT_OF_MEMORY;
 
     rmq_result_t result = rabbitmq_publish_json(
-        RABBITMQ_CHANNEL_MODERATION,
+        RABBITMQ_ROUTE_MODERATION,
         json,
         strlen(json),
         message_id,
