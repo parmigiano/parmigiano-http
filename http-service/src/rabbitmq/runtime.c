@@ -192,6 +192,8 @@ bool rabbitmq_runtime_start(rabbitmq_runtime_t** out)
     if (!runtime)
         return false;
 
+    atomic_init(&runtime->stop, false);
+
     runtime->url = strdup(url);
     runtime->workers = calloc(channel_count, sizeof(*runtime->workers));
     runtime->worker_count = channel_count;
@@ -201,8 +203,6 @@ bool rabbitmq_runtime_start(rabbitmq_runtime_t** out)
         rabbitmq_runtime_stop(runtime);
         return false;
     }
-
-    atomic_init(&runtime->stop, false);
 
     for (size_t i = 0; i < channel_count; ++i)
     {
