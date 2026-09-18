@@ -8,7 +8,7 @@
 
 #define HTTPX_SERVER_PORT 8080
 #define MODERATION_SERVER_PORT 8181
-typedef struct rabbitmq_runtime rabbitmq_runtime_t;
+struct rabbitmq_runtime;
 
 typedef struct {
 	chttpx_app_t app;
@@ -20,7 +20,7 @@ typedef struct {
     PGconn* conn;
     MMDB_s geoip;
 
-    rabbitmq_runtime_t* rabbitmq;
+    struct rabbitmq_runtime* rabbitmq;
 } httpx_server_t;
 
 extern httpx_server_t *http_server;
