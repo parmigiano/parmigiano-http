@@ -3,7 +3,7 @@
 #include "httpx.h"
 #include "logger.h"
 #include "moderation.h"
-#include "rabbitmq.h"
+#include "rabbitmq_app.h"
 
 #include "postgres/postgres_moderation.h"
 
@@ -158,36 +158,9 @@ static rmq_result_t publish_moderation_task(const moderation_task_t* task,
     if (!task || !moderation_target_type_valid(task->target_type) || !task->target_id || !task->reporter_uid)
         return RMQ_INVALID_ARGUMENT;
 
-    const char* url = getenv("RABBITMQ_URL");
-    if (!url || !*url)
-        return RMQ_NOT_CONFIGURED;
-
-    rmq_config_t config = {
-        .url = url,
-        .connect_timeout_ms = 3000,
-        .rpc_timeout_ms = 5000,
-        .heartbeat_seconds = 120,
-        .tls_ca_file = NULL,
-    };
-
-    rmq_client_t* client = NULL;
-    rmq_result_t result = rmq_connect(&client, &config, error);
-    if (result != RMQ_OK)
-        return result;
-
-    result = rabbitmq_setup(client, error);
-    if (result != RMQ_OK)
-    {
-        rmq_disconnect(client);
-        return result;
-    }
-
     cJSON* root = cJSON_CreateObject();
     if (!root)
-    {
-        rmq_disconnect(client);
         return RMQ_OUT_OF_MEMORY;
-    }
 
     char target_id[32];
     char reporter_uid[32];
@@ -200,33 +173,24 @@ static rmq_result_t publish_moderation_task(const moderation_task_t* task,
         !cJSON_AddStringToObject(root, "reporter_uid", reporter_uid))
     {
         cJSON_Delete(root);
-        rmq_disconnect(client);
         return RMQ_OUT_OF_MEMORY;
     }
 
     char* json = cJSON_PrintUnformatted(root);
     cJSON_Delete(root);
+
     if (!json)
-    {
-        rmq_disconnect(client);
         return RMQ_OUT_OF_MEMORY;
-    }
 
-    rmq_publish_t publication = {
-        .exchange = MODERATION_EXCHANGE,
-        .routing_key = MODERATION_ROUTING_KEY,
-        .body = {.data = json, .size = strlen(json)},
-        .content_type = "application/json",
-        .message_id = message_id && *message_id ? message_id : NULL,
-        .correlation_id = NULL,
-        .reply_to = NULL,
-        .persistent = true,
-        .mandatory = true,
-    };
+    rmq_result_t result = rabbitmq_publish_json(
+        RABBITMQ_CHANNEL_MODERATION,
+        json,
+        strlen(json),
+        message_id,
+        error
+    );
 
-    result = rmq_publish(client, &publication, 5000, error);
     free(json);
-    rmq_disconnect(client);
     return result;
 }
 
