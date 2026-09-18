@@ -3,14 +3,14 @@
 Application-level RabbitMQ configuration lives in this directory.
 
 - `rabbitmq.c` — low-level AMQP transport: connect, publish, consume, ACK/NACK, confirms and errors.
-- `channels.c` — the single registry of exchanges, queues, routing keys and consumer handlers.
+- `routes.c` — the single registry of exchanges, queues, routing keys and consumer handlers.
 - `runtime.c` — consumer worker lifecycle, reconnect loop and the high-level JSON publisher.
 
-## Add a new channel
+## Add a new route
 
-1. Add a new value to `rabbitmq_channel_id_t` in `include/rabbitmq_app.h`.
-2. Add one entry to the `channels[]` array in `channels.c`.
-3. Implement the consumer handler if the channel is consumed by this service.
+1. Add a new value to `rabbitmq_route_id_t` in `include/rabbitmq_app.h`.
+2. Add one entry to the `routes[]` array in `routes.c`.
+3. Implement the consumer handler if the route is consumed by this service.
 
 No changes are required in `httpx.c`, `httpx.h`, HTTP routes or worker capacity constants.
 
@@ -18,7 +18,7 @@ Example:
 
 ```c
 {
-    .id = RABBITMQ_CHANNEL_NOTIFICATIONS,
+    .id = RABBITMQ_ROUTE_NOTIFICATIONS,
     .exchange = "notifications",
     .exchange_type = "direct",
     .queue = "notifications.data",
@@ -34,7 +34,7 @@ To publish JSON:
 
 ```c
 rabbitmq_publish_json(
-    RABBITMQ_CHANNEL_NOTIFICATIONS,
+    RABBITMQ_ROUTE_NOTIFICATIONS,
     json,
     strlen(json),
     request_id,
