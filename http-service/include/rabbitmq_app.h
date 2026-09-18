@@ -8,11 +8,11 @@
 #include <stdint.h>
 
 typedef enum {
-    RABBITMQ_CHANNEL_MODERATION = 0,
-} rabbitmq_channel_id_t;
+    RABBITMQ_ROUTE_MODERATION = 0,
+} rabbitmq_route_id_t;
 
 typedef struct {
-    rabbitmq_channel_id_t id;
+    rabbitmq_route_id_t id;
 
     const char* exchange;
     const char* exchange_type;
@@ -25,12 +25,12 @@ typedef struct {
 
     rmq_handler_t handler;
     void* handler_context;
-} rabbitmq_channel_t;
+} rabbitmq_route_t;
 
 typedef struct rabbitmq_runtime rabbitmq_runtime_t;
 
-const rabbitmq_channel_t* rabbitmq_channels(size_t* count);
-const rabbitmq_channel_t* rabbitmq_channel_get(rabbitmq_channel_id_t id);
+const rabbitmq_route_t* rabbitmq_routes(size_t* count);
+const rabbitmq_route_t* rabbitmq_route_get(rabbitmq_route_id_t id);
 
 rmq_result_t rabbitmq_setup(
     rmq_client_t* client,
@@ -41,7 +41,7 @@ bool rabbitmq_runtime_start(rabbitmq_runtime_t** out);
 void rabbitmq_runtime_stop(rabbitmq_runtime_t* runtime);
 
 rmq_result_t rabbitmq_publish_json(
-    rabbitmq_channel_id_t channel_id,
+    rabbitmq_route_id_t route_id,
     const void* data,
     size_t size,
     const char* message_id,
