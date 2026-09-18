@@ -2,9 +2,9 @@
 
 #include "handlers.h"
 
-static const rabbitmq_channel_t channels[] = {
+static const rabbitmq_route_t routes[] = {
     {
-        .id = RABBITMQ_CHANNEL_MODERATION,
+        .id = RABBITMQ_ROUTE_MODERATION,
         .exchange = "moderation",
         .exchange_type = "direct",
         .queue = "moderation.data",
@@ -16,20 +16,20 @@ static const rabbitmq_channel_t channels[] = {
     },
 };
 
-const rabbitmq_channel_t* rabbitmq_channels(size_t* count)
+const rabbitmq_route_t* rabbitmq_routes(size_t* count)
 {
     if (count)
-        *count = sizeof(channels) / sizeof(channels[0]);
+        *count = sizeof(routes) / sizeof(routes[0]);
 
-    return channels;
+    return routes;
 }
 
-const rabbitmq_channel_t* rabbitmq_channel_get(rabbitmq_channel_id_t id)
+const rabbitmq_route_t* rabbitmq_route_get(rabbitmq_route_id_t id)
 {
-    for (size_t i = 0; i < sizeof(channels) / sizeof(channels[0]); ++i)
+    for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); ++i)
     {
-        if (channels[i].id == id)
-            return &channels[i];
+        if (routes[i].id == id)
+            return &routes[i];
     }
 
     return NULL;
@@ -38,17 +38,17 @@ const rabbitmq_channel_t* rabbitmq_channel_get(rabbitmq_channel_id_t id)
 rmq_result_t rabbitmq_setup(rmq_client_t* client, rmq_error_t* error)
 {
     size_t count = 0;
-    const rabbitmq_channel_t* items = rabbitmq_channels(&count);
+    const rabbitmq_route_t* items = rabbitmq_routes(&count);
 
     for (size_t i = 0; i < count; ++i)
     {
-        const rabbitmq_channel_t* channel = &items[i];
+        const rabbitmq_route_t* route = &items[i];
 
         rmq_result_t result = rmq_exchange_declare(
             client,
-            channel->exchange,
-            channel->exchange_type,
-            channel->durable,
+            route->exchange,
+            route->exchange_type,
+            route->durable,
             error
         );
 
@@ -56,8 +56,8 @@ rmq_result_t rabbitmq_setup(rmq_client_t* client, rmq_error_t* error)
             return result;
 
         rmq_queue_config_t queue = {
-            .name = channel->queue,
-            .durable = channel->durable,
+            .name = route->queue,
+            .durable = route->durable,
             .auto_delete = false,
             .dead_letter_exchange = NULL,
             .dead_letter_routing_key = NULL,
@@ -70,9 +70,9 @@ rmq_result_t rabbitmq_setup(rmq_client_t* client, rmq_error_t* error)
 
         result = rmq_queue_bind(
             client,
-            channel->queue,
-            channel->exchange,
-            channel->routing_key,
+            route->queue,
+            route->exchange,
+            route->routing_key,
             error
         );
 
