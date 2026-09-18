@@ -149,7 +149,7 @@ void auth_login_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))
         return;
 
-    user = db_user_core_get_by_email(http_server->conn, payload.email);
+    user = db_user_core_get_by_email(app_context->conn, payload.email);
     if (!user)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusNotFound, cHTTPX_i18n_t("error.user-not-found", req->language));
@@ -220,7 +220,7 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         return;
 
     /* Check user is exists */
-    user = db_user_core_get_by_email(http_server->conn, payload.email);
+    user = db_user_core_get_by_email(app_context->conn, payload.email);
     if (user)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.user-already-registered", req->language));
@@ -316,7 +316,7 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     }
     user_active->user_uid = uid;
 
-    db_result_t user_db_result = db_user_create(http_server->conn, user_core, user_profile, user_profile_access, user_active);
+    db_result_t user_db_result = db_user_create(app_context->conn, user_core, user_profile, user_profile_access, user_active);
 
     /* free memory */
     free(user_core->email);
@@ -417,7 +417,7 @@ void auth_verify_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         goto cleanup;
     }
 
-    user = db_user_core_get_by_email(http_server->conn, payload.email);
+    user = db_user_core_get_by_email(app_context->conn, payload.email);
     if (!user || (user->password && user->password[0] != '\0'))
     {
         redis_mark_email_confirmed(payload.email);
@@ -457,7 +457,7 @@ void auth_delete_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         return;
     }
 
-    db_result_t user_del_db_result = db_user_del_by_uid(http_server->conn, ctx->user->user_uid);
+    db_result_t user_del_db_result = db_user_del_by_uid(app_context->conn, ctx->user->user_uid);
 
     switch (user_del_db_result)
     {
