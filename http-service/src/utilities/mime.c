@@ -1,10 +1,56 @@
 #include "utilities.h"
 
+#include <ctype.h>
 #include <string.h>
 
-static int starts_with(const char* s, const char* p)
+static size_t mime_length(const char* mime)
 {
-    return s && p && strncmp(s, p, strlen(p)) == 0;
+    if (!mime)
+        return 0;
+
+    size_t len = strcspn(mime, ";");
+    while (len > 0 && isspace((unsigned char)mime[len - 1]))
+        len--;
+
+    return len;
+}
+
+static int mime_equals(const char* mime, const char* expected)
+{
+    if (!mime || !expected)
+        return 0;
+
+    size_t mime_len = mime_length(mime);
+    size_t expected_len = strlen(expected);
+    if (mime_len != expected_len)
+        return 0;
+
+    for (size_t i = 0; i < mime_len; ++i)
+    {
+        if (tolower((unsigned char)mime[i]) != tolower((unsigned char)expected[i]))
+            return 0;
+    }
+
+    return 1;
+}
+
+static int mime_family(const char* mime, const char* family)
+{
+    if (!mime || !family)
+        return 0;
+
+    size_t family_len = strlen(family);
+    size_t mime_len = mime_length(mime);
+    if (mime_len < family_len)
+        return 0;
+
+    for (size_t i = 0; i < family_len; ++i)
+    {
+        if (tolower((unsigned char)mime[i]) != tolower((unsigned char)family[i]))
+            return 0;
+    }
+
+    return 1;
 }
 
 const char* map_mime_to_msg_type(const char* mime)
@@ -13,53 +59,51 @@ const char* map_mime_to_msg_type(const char* mime)
         return "file";
 
     /* ---------- IMAGE ---------- */
-    if (starts_with(mime, "image/"))
+    if (mime_family(mime, "image/"))
         return "image";
 
-    if (strcmp(mime, "application/photoshop") == 0 || strcmp(mime, "image/vnd.adobe.photoshop") == 0)
+    if (mime_equals(mime, "application/photoshop") || mime_equals(mime, "image/vnd.adobe.photoshop"))
         return "file";
 
     /* ---------- VIDEO ---------- */
-    if (starts_with(mime, "video/"))
+    if (mime_family(mime, "video/"))
         return "video";
 
-    if (strcmp(mime, "application/x-mpegURL") == 0 || // m3u8
-        strcmp(mime, "application/vnd.apple.mpegurl") == 0)
+    if (mime_equals(mime, "application/x-mpegurl") || mime_equals(mime, "application/vnd.apple.mpegurl"))
         return "video";
 
     /* ---------- VOICE / AUDIO ---------- */
-    if (starts_with(mime, "audio/"))
+    if (mime_family(mime, "audio/"))
         return "voice";
 
-    if (strcmp(mime, "application/ogg") == 0 || strcmp(mime, "audio/ogg") == 0 || strcmp(mime, "audio/opus") == 0 || strcmp(mime, "audio/webm") == 0)
+    if (mime_equals(mime, "application/ogg"))
         return "voice";
 
     /* ---------- TEXT ---------- */
-    if (starts_with(mime, "text/"))
+    if (mime_family(mime, "text/"))
         return "file";
 
-    if (strcmp(mime, "application/json") == 0 || strcmp(mime, "application/xml") == 0)
+    if (mime_equals(mime, "application/json") || mime_equals(mime, "application/xml"))
         return "file";
 
     /* ---------- DOCUMENTS / FILE ---------- */
-    if (strcmp(mime, "application/pdf") == 0 || strcmp(mime, "application/zip") == 0 || strcmp(mime, "application/x-zip-compressed") == 0 ||
-        strcmp(mime, "application/x-rar-compressed") == 0 || strcmp(mime, "application/vnd.rar") == 0 ||
-        strcmp(mime, "application/x-7z-compressed") == 0)
+    if (mime_equals(mime, "application/pdf") || mime_equals(mime, "application/zip") ||
+        mime_equals(mime, "application/x-zip-compressed") || mime_equals(mime, "application/x-rar-compressed") ||
+        mime_equals(mime, "application/vnd.rar") || mime_equals(mime, "application/x-7z-compressed"))
         return "file";
 
     /* Microsoft Office */
-    if (strcmp(mime, "application/msword") == 0 || strcmp(mime, "application/vnd.openxmlformats-officedocument.wordprocessingml.document") == 0 ||
-        strcmp(mime, "application/vnd.ms-excel") == 0 || strcmp(mime, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") == 0 ||
-        strcmp(mime, "application/vnd.ms-powerpoint") == 0 ||
-        strcmp(mime, "application/vnd.openxmlformats-officedocument.presentationml.presentation") == 0)
+    if (mime_equals(mime, "application/msword") ||
+        mime_equals(mime, "application/vnd.openxmlformats-officedocument.wordprocessingml.document") ||
+        mime_equals(mime, "application/vnd.ms-excel") ||
+        mime_equals(mime, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") ||
+        mime_equals(mime, "application/vnd.ms-powerpoint") ||
+        mime_equals(mime, "application/vnd.openxmlformats-officedocument.presentationml.presentation"))
         return "file";
 
     /* Apple formats */
-    if (strcmp(mime, "application/vnd.apple.pages") == 0 || strcmp(mime, "application/vnd.apple.numbers") == 0 ||
-        strcmp(mime, "application/vnd.apple.keynote") == 0)
-        return "file";
-
-    if (strcmp(mime, "application/octet-stream") == 0)
+    if (mime_equals(mime, "application/vnd.apple.pages") || mime_equals(mime, "application/vnd.apple.numbers") ||
+        mime_equals(mime, "application/vnd.apple.keynote"))
         return "file";
 
     return "file";
