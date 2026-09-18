@@ -21,9 +21,9 @@ typedef struct {
     MMDB_s geoip;
 
     struct rabbitmq_runtime* rabbitmq;
-} httpx_server_t;
+} app_context_t;
 
-extern httpx_server_t *http_server;
+extern app_context_t *app_context;
 
 void http_init(void);
 
