@@ -15,7 +15,7 @@ typedef struct {
     pthread_t thread;
     bool started;
 
-    const rabbitmq_channel_t* channel;
+    const rabbitmq_route_t* route;
     const char* url;
 
     atomic_bool* stop;
@@ -60,9 +60,9 @@ static rmq_action_t rabbitmq_dispatch(const rmq_message_t* message, void* userda
         return RMQ_REQUEUE;
     }
 
-    worker->last_action = worker->channel->handler(
+    worker->last_action = worker->route->handler(
         message,
-        worker->channel->handler_context
+        worker->route->handler_context
     );
 
     return worker->last_action;
@@ -90,7 +90,7 @@ static void* rabbitmq_worker_main(void* arg)
         {
             logger_error(
                 "RabbitMQ queue=%s operation=%s error=%s",
-                worker->channel->queue,
+                worker->route->queue,
                 error.operation,
                 error.detail
             );
@@ -105,8 +105,8 @@ static void* rabbitmq_worker_main(void* arg)
         {
             result = rmq_subscribe(
                 client,
-                worker->channel->queue,
-                worker->channel->prefetch,
+                worker->route->queue,
+                worker->route->prefetch,
                 &error
             );
         }
@@ -115,7 +115,7 @@ static void* rabbitmq_worker_main(void* arg)
         {
             logger_error(
                 "RabbitMQ queue=%s operation=%s error=%s",
-                worker->channel->queue,
+                worker->route->queue,
                 error.operation,
                 error.detail
             );
@@ -144,7 +144,7 @@ static void* rabbitmq_worker_main(void* arg)
             {
                 logger_error(
                     "RabbitMQ queue=%s operation=%s error=%s",
-                    worker->channel->queue,
+                    worker->route->queue,
                     error.operation,
                     error.detail
                 );
@@ -179,12 +179,12 @@ bool rabbitmq_runtime_start(rabbitmq_runtime_t** out)
         return false;
     }
 
-    size_t channel_count = 0;
-    const rabbitmq_channel_t* channels = rabbitmq_channels(&channel_count);
+    size_t route_count = 0;
+    const rabbitmq_route_t* routes = rabbitmq_routes(&route_count);
 
-    if (!channels || channel_count == 0)
+    if (!routes || route_count == 0)
     {
-        logger_warn("RabbitMQ: no channels configured");
+        logger_warn("RabbitMQ: no routes configured");
         return true;
     }
 
@@ -195,8 +195,8 @@ bool rabbitmq_runtime_start(rabbitmq_runtime_t** out)
     atomic_init(&runtime->stop, false);
 
     runtime->url = strdup(url);
-    runtime->workers = calloc(channel_count, sizeof(*runtime->workers));
-    runtime->worker_count = channel_count;
+    runtime->workers = calloc(route_count, sizeof(*runtime->workers));
+    runtime->worker_count = route_count;
 
     if (!runtime->url || !runtime->workers)
     {
@@ -204,11 +204,11 @@ bool rabbitmq_runtime_start(rabbitmq_runtime_t** out)
         return false;
     }
 
-    for (size_t i = 0; i < channel_count; ++i)
+    for (size_t i = 0; i < route_count; ++i)
     {
         rabbitmq_worker_t* worker = &runtime->workers[i];
 
-        worker->channel = &channels[i];
+        worker->route = &routes[i];
         worker->url = runtime->url;
         worker->stop = &runtime->stop;
         worker->last_action = RMQ_ACK;
@@ -224,7 +224,7 @@ bool rabbitmq_runtime_start(rabbitmq_runtime_t** out)
         {
             logger_error(
                 "RabbitMQ: cannot start worker queue=%s: %s",
-                worker->channel->queue,
+                worker->route->queue,
                 strerror(rc)
             );
 
@@ -266,7 +266,7 @@ void rabbitmq_runtime_stop(rabbitmq_runtime_t* runtime)
 }
 
 rmq_result_t rabbitmq_publish_json(
-    rabbitmq_channel_id_t channel_id,
+    rabbitmq_route_id_t route_id,
     const void* data,
     size_t size,
     const char* message_id,
@@ -276,7 +276,7 @@ rmq_result_t rabbitmq_publish_json(
     if (!data || size == 0)
         return RMQ_INVALID_ARGUMENT;
 
-    const rabbitmq_channel_t* channel = rabbitmq_channel_get(channel_id);
+    const rabbitmq_route_t* route = rabbitmq_route_get(route_id);
     if (!channel)
         return RMQ_NOT_FOUND;
 
@@ -301,8 +301,8 @@ rmq_result_t rabbitmq_publish_json(
     if (result == RMQ_OK)
     {
         rmq_publish_t publication = {
-            .exchange = channel->exchange,
-            .routing_key = channel->routing_key,
+            .exchange = route->exchange,
+            .routing_key = route->routing_key,
             .body = {
                 .data = data,
                 .size = size,
