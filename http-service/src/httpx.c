@@ -2,14 +2,12 @@
 
 #include "logger.h"
 #include "routes.h"
-#include "rabbitmq.h"
+#include "rabbitmq_app.h"
 #include "utilities.h"
 #include "middlewarex.h"
 #include "redis/redis.h"
 #include "postgres/postgres.h"
 
-#include <time.h>
-#include <errno.h>
 #include <string.h>
 #include <maxminddb.h>
 #include <curl/curl.h>
@@ -19,10 +17,6 @@ httpx_server_t *http_server = NULL;
 
 static void _cors(chttpx_serv_t* server);
 static void _http_cleanup(void);
-
-/* RabbitMQ prepare */
-static void rabbitmq_workers_stop(httpx_server_t *server);
-static bool rabbitmq_workers_start(httpx_server_t *server);
 
 void http_init(void)
 {
@@ -159,9 +153,9 @@ void http_init(void)
     http_routes(http_server->http);
     moderation_routes(http_server->moderation);
 
-    if (!rabbitmq_workers_start(http_server))
+    if (!rabbitmq_runtime_start(&http_server->rabbitmq))
     {
-        logger_error("Failed to start RabbitMQ workers");
+        logger_error("Failed to start RabbitMQ runtime");
     }
 
     int run_result = cHTTPX_AppRun(&http_server->app);
@@ -176,10 +170,11 @@ void http_init(void)
 static void _http_cleanup(void)
 {
 	if (!http_server)
-		return
+		return;
 
 	/* RabbitMQ */
-    rabbitmq_workers_stop(http_server);
+    rabbitmq_runtime_stop(http_server->rabbitmq);
+    http_server->rabbitmq = NULL;
 
 	if (http_server->app_initialized)
 	{
@@ -244,193 +239,4 @@ static void _cors(chttpx_serv_t* server)
     cHTTPX_Cors(server, allowed_origins, origins_count, NULL,
                 "Content-Type, Authorization, Accept-Language, X-Debug, Pow-Challenge, Pow-Nonce, X-Real-IP, X-Forwarded-For, X-Forwarded-Proto, "
                 "Upgrade, Connection, Host");
-}
-
-static void rabbitmq_retry_pause(httpx_rabbitmq_worker_t *worker)
-{
-	for (int i = 0; i < 50; ++i)
-	{
-		if (atomic_load(worker->stop))
-			return;
-
-		struct timespec remaining = {
-            .tv_sec = 0,
-            .tv_nsec = 100000000L /* 100 мс */
-        };
-
-		while (nanosleep(&remaining, &remaining) == -1) {
-            if (errno != EINTR)
-                return;
-
-            if (atomic_load(worker->stop))
-                return;
-        }
-	}
-}
-
-static rmq_action_t rabbitmq_dispatch(const rmq_message_t *message, void *userdata)
-{
-	httpx_rabbitmq_worker_t *worker = userdata;
-
-    if (atomic_load(worker->stop)) {
-        worker->last_action = RMQ_REQUEUE;
-        return RMQ_REQUEUE;
-    }
-
-    worker->last_action = worker->handler(
-        message,
-        worker->handler_context
-    );
-
-    return worker->last_action;
-}
-
-static void *rabbitmq_worker_main(void *arg)
-{
-	httpx_rabbitmq_worker_t *worker = arg;
-
-    rmq_config_t config = {
-        .url = worker->url,
-        .connect_timeout_ms = 3000,
-        .rpc_timeout_ms = 5000,
-        .heartbeat_seconds = 180,
-        .tls_ca_file = NULL
-    };
-
-    while (!atomic_load(worker->stop)) {
-        rmq_client_t *client = NULL;
-        rmq_error_t error = {0};
-
-        rmq_result_t result = rmq_connect(&client, &config, &error);
-
-        if (result != RMQ_OK) {
-            logger_error("RabbitMQ queue=%s operation=%s error=%s", worker->queue, error.operation, error.detail);
-
-            rabbitmq_retry_pause(worker);
-            continue;
-        }
-
-        result = rabbitmq_setup(client, &error);
-
-        if (result == RMQ_OK && !atomic_load(worker->stop)) {
-            result = rmq_subscribe(client, worker->queue, 1, &error);
-        }
-
-        if (result != RMQ_OK) {
-            logger_error("RabbitMQ queue=%s operation=%s error=%s", worker->queue, error.operation, error.detail);
-
-            rmq_disconnect(client);
-            rabbitmq_retry_pause(worker);
-            continue;
-        }
-
-        while (!atomic_load(worker->stop)) {
-            worker->last_action = RMQ_ACK;
-
-            result = rmq_consume_one(client, 1000, rabbitmq_dispatch, worker, &error);
-
-            if (result == RMQ_IDLE)
-                continue;
-
-            if (result != RMQ_OK) {
-                logger_error("RabbitMQ queue=%s operation=%s error=%s", worker->queue, error.operation, error.detail);
-                break;
-            }
-
-            if (worker->last_action == RMQ_REQUEUE)
-                break;
-        }
-
-        rmq_disconnect(client);
-
-        if (!atomic_load(worker->stop))
-            rabbitmq_retry_pause(worker);
-    }
-
-    return NULL;
-}
-
-static void rabbitmq_workers_stop(httpx_server_t *server)
-{
-    if (!server || !server->rabbitmq_url)
-        return;
-
-    atomic_store(&server->rabbitmq_stop, true);
-
-    for (size_t i = 0; i < HTTPX_RABBITMQ_WORKERS; ++i) {
-        httpx_rabbitmq_worker_t *worker = &server->rabbitmq_workers[i];
-
-        if (!worker->started)
-            continue;
-
-        pthread_join(worker->thread, NULL);
-        worker->started = false;
-    }
-
-    free(server->rabbitmq_url);
-    server->rabbitmq_url = NULL;
-}
-
-static bool rabbitmq_workers_start(httpx_server_t *server)
-{
-    if (!server)
-        return false;
-
-    if (server->rabbitmq_url)
-        return false;
-
-    size_t count = 0;
-    const rabbitmq_route_t* definitions = rabbitmq_routes(&count);
-
-    if (count > HTTPX_RABBITMQ_WORKERS)
-    {
-        logger_error("RabbitMQ: too many routes (%zu), worker capacity is %d", count, HTTPX_RABBITMQ_WORKERS);
-        return false;
-    }
-
-    const char *url = getenv("RABBITMQ_URL");
-
-    if (!url || !*url) {
-        logger_error("RabbitMQ: RABBITMQ_URL is empty");
-        return false;
-    }
-
-    size_t url_size = strlen(url) + 1;
-
-    server->rabbitmq_url = malloc(url_size);
-
-    if (!server->rabbitmq_url) {
-        logger_error("RabbitMQ: cannot allocate URL");
-        return false;
-    }
-
-    memcpy(server->rabbitmq_url, url, url_size);
-
-    atomic_init(&server->rabbitmq_stop, false);
-
-    for (size_t i = 0; i < count; ++i) {
-        httpx_rabbitmq_worker_t *worker = &server->rabbitmq_workers[i];
-
-        worker->started = false;
-        worker->queue = definitions[i].queue;
-        worker->handler = definitions[i].handler;
-        worker->handler_context = NULL;
-
-        worker->url = server->rabbitmq_url;
-        worker->stop = &server->rabbitmq_stop;
-        worker->last_action = RMQ_ACK;
-
-        int rc = pthread_create(&worker->thread, NULL, rabbitmq_worker_main, worker);
-
-        if (rc != 0) {
-            logger_error("RabbitMQ: cannot start worker queue=%s: %s", worker->queue, strerror(rc));
-
-            rabbitmq_workers_stop(server);
-            return false;
-        }
-
-        worker->started = true;
-    }
-
-    return true;
 }
