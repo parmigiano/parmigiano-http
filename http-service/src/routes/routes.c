@@ -3,18 +3,6 @@
 #include "handlers.h"
 #include "middlewarex.h"
 
-const rabbitmq_route_t* rabbitmq_routes(size_t* count)
-{
-    static const rabbitmq_route_t items[] = {
-        {MODERATION_QUEUE, moderation_data_handler_v2},
-    };
-
-    if (count)
-        *count = sizeof(items) / sizeof(items[0]);
-
-    return items;
-}
-
 void http_routes(chttpx_serv_t* server)
 {
     chttpx_router_t api = cHTTPX_RoutePathPrefix(server, "/api/v2");
