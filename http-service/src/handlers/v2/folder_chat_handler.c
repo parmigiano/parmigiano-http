@@ -51,7 +51,7 @@ void group_chats_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res
 
     chat_group_t group = {.user_uid = ctx->user->user_uid, .name = payload.name};
 
-    PGconn* conn = http_server->conn;
+    PGconn* conn = app_context->conn;
     PGresult* pg_res = NULL;
 
     /* Begin transation db */
@@ -68,7 +68,7 @@ void group_chats_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res
     if (r != DB_OK || group_id == 0)
         goto rollback;
 
-    r = db_group_chat_add_chats(http_server->conn, ctx->user->user_uid, group_id, payload.chat_ids.items, payload.chat_ids.count);
+    r = db_group_chat_add_chats(app_context->conn, ctx->user->user_uid, group_id, payload.chat_ids.items, payload.chat_ids.count);
     if (r != DB_OK)
         goto rollback;
 
@@ -165,7 +165,7 @@ void group_chats_edit_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         return;
     }
 
-    PGconn* conn = http_server->conn;
+    PGconn* conn = app_context->conn;
     PGresult* pg_res = NULL;
 
     /* Begin transation db */
@@ -263,7 +263,7 @@ void group_chats_delete_handler_v2(chttpx_request_t* req, chttpx_response_t* res
         return;
     }
 
-    db_result_t db_group_delete = db_group_chat_delete(http_server->conn, ctx->user->user_uid, group_id);
+    db_result_t db_group_delete = db_group_chat_delete(app_context->conn, ctx->user->user_uid, group_id);
 
     switch (db_group_delete)
     {

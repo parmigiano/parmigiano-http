@@ -156,7 +156,7 @@ void user_upload_avatar_handler_v2(chttpx_request_t* req, chttpx_response_t* res
     remove_uploaded_file = true;
 
     /* update in database */
-    db_result_t user_upd_result = db_user_profile_upd_avatar_by_uid(http_server->conn, ctx->user->user_uid, url);
+    db_result_t user_upd_result = db_user_profile_upd_avatar_by_uid(app_context->conn, ctx->user->user_uid, url);
 
     switch (user_upd_result)
     {
@@ -215,7 +215,7 @@ void user_get_profile_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         goto cleanup;
     }
 
-    user = db_user_info_get_by_uid(http_server->conn, user_uid);
+    user = db_user_info_get_by_uid(app_context->conn, user_uid);
     if (!user)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusNotFound, cHTTPX_i18n_t("error.user-not-found", req->language));
@@ -303,7 +303,7 @@ void user_update_profile_handler_v2(chttpx_request_t* req, chttpx_response_t* re
         payload.password = password_hash;
     }
 
-    db_result_t user_db_result = db_user_UPDATE_upd(http_server->conn, ctx->user->user_uid, &payload);
+    db_result_t user_db_result = db_user_UPDATE_upd(app_context->conn, ctx->user->user_uid, &payload);
 
     switch (user_db_result)
     {

@@ -5,13 +5,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-/* QUEUEs */
-#define MODERATION_QUEUE   "moderation.data"
-
-/* Moderation route */
-#define MODERATION_EXCHANGE    "moderation"
-#define MODERATION_ROUTING_KEY "moderation.scan"
-
 typedef struct rmq_client rmq_client_t;
 
 typedef enum {
@@ -115,11 +108,6 @@ typedef enum {
 typedef rmq_action_t (*rmq_handler_t)(
     const rmq_message_t *message,
     void *userdata
-);
-
-rmq_result_t rabbitmq_setup(
-    rmq_client_t *client,
-    rmq_error_t *error
 );
 
 /* One client per owning thread. Do not mix publishing and consuming on it.

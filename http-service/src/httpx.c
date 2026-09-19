@@ -2,42 +2,36 @@
 
 #include "logger.h"
 #include "routes.h"
-#include "rabbitmq.h"
+#include "rabbitmq_app.h"
 #include "utilities.h"
 #include "middlewarex.h"
 #include "redis/redis.h"
 #include "postgres/postgres.h"
 
-#include <time.h>
-#include <errno.h>
 #include <string.h>
 #include <maxminddb.h>
 #include <curl/curl.h>
 #include <libchttpx/libchttpx.h>
 
-httpx_server_t *http_server = NULL;
+app_context_t *app_context = NULL;
 
 static void _cors(chttpx_serv_t* server);
 static void _http_cleanup(void);
-
-/* RabbitMQ prepare */
-static void rabbitmq_workers_stop(httpx_server_t *server);
-static bool rabbitmq_workers_start(httpx_server_t *server);
 
 void http_init(void)
 {
     /* Initial logger */
     logger_init();
 
-	http_server = (httpx_server_t*)calloc(1, sizeof(httpx_server_t));
-    if (!http_server)
+	app_context = (app_context_t*)calloc(1, sizeof(app_context_t));
+    if (!app_context)
     {
-        logger_error("http_init: calloc failed for http_server");
+        logger_error("http_init: calloc failed for app_context");
         fprintf(stderr, "calloc failed\n");
         return;
     }
 
-	chttpx_error_t app_result = cHTTPX_AppInit(&http_server->app);
+	chttpx_error_t app_result = cHTTPX_AppInit(&app_context->app);
 	if (app_result != CHTTPX_OK)
 	{
 		logger_error("http_init: failed to initialize cHTTPX App, error=%d", app_result);
@@ -46,7 +40,7 @@ void http_init(void)
 		_http_cleanup();
 		return;
 	}
-	http_server->app_initialized = true;
+	app_context->app_initialized = true;
 
 	/* Initial HTTP server / Config */
 	static const char* languages[] = {
@@ -69,8 +63,8 @@ void http_init(void)
 	http_config.log_level = CHTTPX_LOG_INFO;
 	http_config.logger = logger_httpx;
 
-	http_server->http = cHTTPX_AppServer(&http_server->app, "http", &http_config);
-	if (!http_server->http)
+	app_context->http = cHTTPX_AppServer(&app_context->app, "http", &http_config);
+	if (!app_context->http)
 	{
 		logger_error("http_init: failed to create http server");
 		fprintf(stderr, "failed to create http server\n");
@@ -96,8 +90,8 @@ void http_init(void)
 	moderation_config.log_level = CHTTPX_LOG_INFO;
 	moderation_config.logger = logger_httpx;
 
-	http_server->moderation = cHTTPX_AppServer(&http_server->app, "moderation", &moderation_config);
-	if (!http_server->moderation)
+	app_context->moderation = cHTTPX_AppServer(&app_context->app, "moderation", &moderation_config);
+	if (!app_context->moderation)
 	{
 		logger_error("http_init: failed to create moderation server");
 		fprintf(stderr, "failed to create moderation server\n");
@@ -118,8 +112,8 @@ void http_init(void)
     }
 
     /* Inital database, migrations */
-    http_server->conn = db_conn();
-    if (!http_server->conn)
+    app_context->conn = db_conn();
+    if (!app_context->conn)
     {
         logger_error("http_init: failed to connect to database");
         fprintf(stderr, "failed to connect to database\n");
@@ -128,10 +122,10 @@ void http_init(void)
 		return;
     }
 
-    run_migrations(http_server->conn);
+    run_migrations(app_context->conn);
 
     /* Load in memory GeoIP */
-    int status = MMDB_open("/usr/local/share/GeoIP/GeoLite2-Country.mmdb", MMDB_MODE_MMAP, &http_server->geoip);
+    int status = MMDB_open("/usr/local/share/GeoIP/GeoLite2-Country.mmdb", MMDB_MODE_MMAP, &app_context->geoip);
     if (status != MMDB_SUCCESS)
     {
         logger_error("http_init: failed load GeoIP in memory: %s", MMDB_strerror(status));
@@ -145,26 +139,26 @@ void http_init(void)
     start_ai_worker();
 
     /* Cors */
-    _cors(http_server->http);
-    _cors(http_server->moderation);
+    _cors(app_context->http);
+    _cors(app_context->moderation);
 
     /* Initial middlewares */
-    cHTTPX_MiddlewareLogging(http_server->http);
-	cHTTPX_MiddlewareLogging(http_server->moderation);
-    cHTTPX_MiddlewareRateLimiter(http_server->http, 5, 1);
-    cHTTPX_MiddlewareUse(http_server->http, geoip_block_middleware);
+    cHTTPX_MiddlewareLogging(app_context->http);
+	cHTTPX_MiddlewareLogging(app_context->moderation);
+    cHTTPX_MiddlewareRateLimiter(app_context->http, 5, 1);
+    cHTTPX_MiddlewareUse(app_context->http, geoip_block_middleware);
     // cHTTPX_MiddlewareUse(email_confirmed_middleware);
 
     /* Initial routes */
-    http_routes(http_server->http);
-    moderation_routes(http_server->moderation);
+    http_routes(app_context->http);
+    moderation_routes(app_context->moderation);
 
-    if (!rabbitmq_workers_start(http_server))
+    if (!rabbitmq_runtime_start(&app_context->rabbitmq))
     {
-        logger_error("Failed to start RabbitMQ workers");
+        logger_error("Failed to start RabbitMQ runtime");
     }
 
-    int run_result = cHTTPX_AppRun(&http_server->app);
+    int run_result = cHTTPX_AppRun(&app_context->app);
 	if (run_result != CHTTPX_OK)
 	{
 		logger_error("http_init: cHTTPX_AppRun failed, error=%d", run_result);
@@ -175,28 +169,29 @@ void http_init(void)
 
 static void _http_cleanup(void)
 {
-	if (!http_server)
-		return
+	if (!app_context)
+		return;
 
 	/* RabbitMQ */
-    rabbitmq_workers_stop(http_server);
+    rabbitmq_runtime_stop(app_context->rabbitmq);
+    app_context->rabbitmq = NULL;
 
-	if (http_server->app_initialized)
+	if (app_context->app_initialized)
 	{
-		cHTTPX_AppShutdown(&http_server->app);
+		cHTTPX_AppShutdown(&app_context->app);
 
-		http_server->app_initialized = false;
-		http_server->http = NULL;
+		app_context->app_initialized = false;
+		app_context->http = NULL;
 	}
 
 	/* Free mmdb GeoIP */
-    MMDB_close(&http_server->geoip);
+    MMDB_close(&app_context->geoip);
 
 	/* PostgreSQL */
-	if (http_server->conn)
+	if (app_context->conn)
     {
-        db_close(http_server->conn);
-        http_server->conn = NULL;
+        db_close(app_context->conn);
+        app_context->conn = NULL;
     }
 
 	/* Redis */
@@ -205,8 +200,8 @@ static void _http_cleanup(void)
 	/* Free CURL */
     curl_global_cleanup();
 
-    free(http_server);
-    http_server = NULL;
+    free(app_context);
+    app_context = NULL;
 }
 
 static void _cors(chttpx_serv_t* server)
@@ -244,193 +239,4 @@ static void _cors(chttpx_serv_t* server)
     cHTTPX_Cors(server, allowed_origins, origins_count, NULL,
                 "Content-Type, Authorization, Accept-Language, X-Debug, Pow-Challenge, Pow-Nonce, X-Real-IP, X-Forwarded-For, X-Forwarded-Proto, "
                 "Upgrade, Connection, Host");
-}
-
-static void rabbitmq_retry_pause(httpx_rabbitmq_worker_t *worker)
-{
-	for (int i = 0; i < 50; ++i)
-	{
-		if (atomic_load(worker->stop))
-			return;
-
-		struct timespec remaining = {
-            .tv_sec = 0,
-            .tv_nsec = 100000000L /* 100 мс */
-        };
-
-		while (nanosleep(&remaining, &remaining) == -1) {
-            if (errno != EINTR)
-                return;
-
-            if (atomic_load(worker->stop))
-                return;
-        }
-	}
-}
-
-static rmq_action_t rabbitmq_dispatch(const rmq_message_t *message, void *userdata)
-{
-	httpx_rabbitmq_worker_t *worker = userdata;
-
-    if (atomic_load(worker->stop)) {
-        worker->last_action = RMQ_REQUEUE;
-        return RMQ_REQUEUE;
-    }
-
-    worker->last_action = worker->handler(
-        message,
-        worker->handler_context
-    );
-
-    return worker->last_action;
-}
-
-static void *rabbitmq_worker_main(void *arg)
-{
-	httpx_rabbitmq_worker_t *worker = arg;
-
-    rmq_config_t config = {
-        .url = worker->url,
-        .connect_timeout_ms = 3000,
-        .rpc_timeout_ms = 5000,
-        .heartbeat_seconds = 180,
-        .tls_ca_file = NULL
-    };
-
-    while (!atomic_load(worker->stop)) {
-        rmq_client_t *client = NULL;
-        rmq_error_t error = {0};
-
-        rmq_result_t result = rmq_connect(&client, &config, &error);
-
-        if (result != RMQ_OK) {
-            logger_error("RabbitMQ queue=%s operation=%s error=%s", worker->queue, error.operation, error.detail);
-
-            rabbitmq_retry_pause(worker);
-            continue;
-        }
-
-        result = rabbitmq_setup(client, &error);
-
-        if (result == RMQ_OK && !atomic_load(worker->stop)) {
-            result = rmq_subscribe(client, worker->queue, 1, &error);
-        }
-
-        if (result != RMQ_OK) {
-            logger_error("RabbitMQ queue=%s operation=%s error=%s", worker->queue, error.operation, error.detail);
-
-            rmq_disconnect(client);
-            rabbitmq_retry_pause(worker);
-            continue;
-        }
-
-        while (!atomic_load(worker->stop)) {
-            worker->last_action = RMQ_ACK;
-
-            result = rmq_consume_one(client, 1000, rabbitmq_dispatch, worker, &error);
-
-            if (result == RMQ_IDLE)
-                continue;
-
-            if (result != RMQ_OK) {
-                logger_error("RabbitMQ queue=%s operation=%s error=%s", worker->queue, error.operation, error.detail);
-                break;
-            }
-
-            if (worker->last_action == RMQ_REQUEUE)
-                break;
-        }
-
-        rmq_disconnect(client);
-
-        if (!atomic_load(worker->stop))
-            rabbitmq_retry_pause(worker);
-    }
-
-    return NULL;
-}
-
-static void rabbitmq_workers_stop(httpx_server_t *server)
-{
-    if (!server || !server->rabbitmq_url)
-        return;
-
-    atomic_store(&server->rabbitmq_stop, true);
-
-    for (size_t i = 0; i < HTTPX_RABBITMQ_WORKERS; ++i) {
-        httpx_rabbitmq_worker_t *worker = &server->rabbitmq_workers[i];
-
-        if (!worker->started)
-            continue;
-
-        pthread_join(worker->thread, NULL);
-        worker->started = false;
-    }
-
-    free(server->rabbitmq_url);
-    server->rabbitmq_url = NULL;
-}
-
-static bool rabbitmq_workers_start(httpx_server_t *server)
-{
-    if (!server)
-        return false;
-
-    if (server->rabbitmq_url)
-        return false;
-
-    size_t count = 0;
-    const rabbitmq_route_t* definitions = rabbitmq_routes(&count);
-
-    if (count > HTTPX_RABBITMQ_WORKERS)
-    {
-        logger_error("RabbitMQ: too many routes (%zu), worker capacity is %d", count, HTTPX_RABBITMQ_WORKERS);
-        return false;
-    }
-
-    const char *url = getenv("RABBITMQ_URL");
-
-    if (!url || !*url) {
-        logger_error("RabbitMQ: RABBITMQ_URL is empty");
-        return false;
-    }
-
-    size_t url_size = strlen(url) + 1;
-
-    server->rabbitmq_url = malloc(url_size);
-
-    if (!server->rabbitmq_url) {
-        logger_error("RabbitMQ: cannot allocate URL");
-        return false;
-    }
-
-    memcpy(server->rabbitmq_url, url, url_size);
-
-    atomic_init(&server->rabbitmq_stop, false);
-
-    for (size_t i = 0; i < count; ++i) {
-        httpx_rabbitmq_worker_t *worker = &server->rabbitmq_workers[i];
-
-        worker->started = false;
-        worker->queue = definitions[i].queue;
-        worker->handler = definitions[i].handler;
-        worker->handler_context = NULL;
-
-        worker->url = server->rabbitmq_url;
-        worker->stop = &server->rabbitmq_stop;
-        worker->last_action = RMQ_ACK;
-
-        int rc = pthread_create(&worker->thread, NULL, rabbitmq_worker_main, worker);
-
-        if (rc != 0) {
-            logger_error("RabbitMQ: cannot start worker queue=%s: %s", worker->queue, strerror(rc));
-
-            rabbitmq_workers_stop(server);
-            return false;
-        }
-
-        worker->started = true;
-    }
-
-    return true;
 }

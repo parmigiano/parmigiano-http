@@ -31,7 +31,7 @@ chttpx_middleware_result_t authenticate_middleware(chttpx_request_t* req, chttpx
     free(session);
     session = NULL;
 
-    user_info_t* user = db_user_info_get_by_uid(http_server->conn, user_uid);
+    user_info_t* user = db_user_info_get_by_uid(app_context->conn, user_uid);
     if (!user)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
@@ -39,7 +39,7 @@ chttpx_middleware_result_t authenticate_middleware(chttpx_request_t* req, chttpx
     }
 
     user_block_t* block = NULL;
-    db_result_t block_result = db_user_block_get_active(http_server->conn, user_uid, &block);
+    db_result_t block_result = db_user_block_get_active(app_context->conn, user_uid, &block);
     if (block_result != DB_OK)
     {
         db_user_info_free(user);

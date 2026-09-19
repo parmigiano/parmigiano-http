@@ -40,7 +40,7 @@ void media_upload_in_chat_handler_v2(chttpx_request_t* req, chttpx_response_t* r
         return;
     }
 
-    bool is_member = db_chat_get_member_exists_by_chat_id(http_server->conn, chat_id, ctx->user->user_uid);
+    bool is_member = db_chat_get_member_exists_by_chat_id(app_context->conn, chat_id, ctx->user->user_uid);
     if (!is_member)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusForbidden, cHTTPX_i18n_t("error.not-member-chat", req->language));
@@ -105,7 +105,7 @@ void media_upload_in_chat_handler_v2(chttpx_request_t* req, chttpx_response_t* r
         goto cleanup;
     }
 
-    db_result_t message_db_result = db_message_create_all(http_server->conn, message);
+    db_result_t message_db_result = db_message_create_all(app_context->conn, message);
 
     switch (message_db_result)
     {

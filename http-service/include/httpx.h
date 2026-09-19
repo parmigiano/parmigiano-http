@@ -1,34 +1,14 @@
 #ifndef HTTPX_H
 #define HTTPX_H
 
-#include "rabbitmq.h"
-
 #include <stdbool.h>
-#include <pthread.h>
-#include <stdatomic.h>
-
 #include <libpq-fe.h>
 #include <maxminddb.h>
 #include <libchttpx/libchttpx.h>
 
 #define HTTPX_SERVER_PORT 8080
 #define MODERATION_SERVER_PORT 8181
-#define HTTPX_RABBITMQ_WORKERS 1
-
-typedef struct {
-	pthread_t thread;
-    bool started;
-
-	const char *queue;
-    const char *url;
-
-	rmq_handler_t handler;
-    void *handler_context;
-
-	atomic_bool *stop;
-
-	rmq_action_t last_action;
-} httpx_rabbitmq_worker_t;
+struct rabbitmq_runtime;
 
 typedef struct {
 	chttpx_app_t app;
@@ -40,15 +20,10 @@ typedef struct {
     PGconn* conn;
     MMDB_s geoip;
 
-	char *rabbitmq_url;
-    atomic_bool rabbitmq_stop;
+    struct rabbitmq_runtime* rabbitmq;
+} app_context_t;
 
-	httpx_rabbitmq_worker_t rabbitmq_workers[
-        HTTPX_RABBITMQ_WORKERS
-    ];
-} httpx_server_t;
-
-extern httpx_server_t *http_server;
+extern app_context_t *app_context;
 
 void http_init(void);
 
