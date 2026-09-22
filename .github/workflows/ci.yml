@@ -36,11 +36,11 @@ jobs:
             --std=c11 \
             --enable=warning,performance,portability \
             --suppress=missingIncludeSystem \
-            --suppress=wrongPrintfScanfArgNum:src/handlers/v2/auth_handler.c \
+            --suppress=wrongPrintfScanfArgNum:auth-server/auth_handler.c \
             --inline-suppr \
             --error-exitcode=1 \
             -I include \
-            src/ include/
+            main-server/ auth-server/ src/ include/
 
   repository-validation:
     name: Repository validation
