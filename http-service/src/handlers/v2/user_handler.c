@@ -4,6 +4,7 @@
 #include "httpx.h"
 #include "logger.h"
 #include "nsfw.h"
+#include "profanity.h"
 #include "utilities.h"
 
 #include <inttypes.h>
@@ -283,6 +284,10 @@ void user_update_profile_handler_v2(chttpx_request_t* req, chttpx_response_t* re
     };
 
     if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))
+        return;
+
+    const char* profanity_texts[] = {payload.username, payload.name, payload.overview};
+    if (!profanity_reject_from_env(req, res, "user.update", profanity_texts, 3))
         return;
 
     payload.username_visible = fields[1].present ? &username_visible : NULL;

@@ -3,6 +3,7 @@
 #include "s3.h"
 #include "httpx.h"
 #include "logger.h"
+#include "profanity.h"
 #include "utilities.h"
 #include "redis/redis.h"
 #include "redis/redis_limits.h"
@@ -217,6 +218,10 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     user_active_t* user_active = NULL;
 
     if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))
+        return;
+
+    const char* profanity_texts[] = {payload.name, payload.username};
+    if (!profanity_reject_from_env(req, res, "auth.create", profanity_texts, 2))
         return;
 
     /* Check user is exists */

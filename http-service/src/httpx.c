@@ -76,19 +76,6 @@ void http_init(void)
 
 	chttpx_config_t moderation_config = cHTTPX_DefaultConfig();
 	moderation_config.port = MODERATION_SERVER_PORT;
-	moderation_config.max_clients = 8192;
-	moderation_config.read_timeout_sec = 60;
-	moderation_config.write_timeout_sec = 60;
-	moderation_config.idle_timeout_sec = 90;
-	moderation_config.max_header_size = 16 * 1024;
-	moderation_config.max_body_size = 10 * 1024 * 1024;
-	moderation_config.max_upload_size = 500ULL * 1024 * 1024;
-	moderation_config.request_id_enabled = true;
-	moderation_config.languages = languages;
-	moderation_config.languages_count = CHTTPX_ARRAY_LEN(languages);
-	moderation_config.default_language = "en";
-	moderation_config.log_level = CHTTPX_LOG_INFO;
-	moderation_config.logger = logger_httpx;
 
 	app_context->moderation = cHTTPX_AppServer(&app_context->app, "moderation", &moderation_config);
 	if (!app_context->moderation)

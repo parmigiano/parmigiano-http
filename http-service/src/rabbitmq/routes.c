@@ -44,13 +44,7 @@ rmq_result_t rabbitmq_setup(rmq_client_t* client, rmq_error_t* error)
     {
         const rabbitmq_route_t* route = &items[i];
 
-        rmq_result_t result = rmq_exchange_declare(
-            client,
-            route->exchange,
-            route->exchange_type,
-            route->durable,
-            error
-        );
+        rmq_result_t result = rmq_exchange_declare(client, route->exchange, route->exchange_type, route->durable, error);
 
         if (result != RMQ_OK)
             return result;
@@ -70,13 +64,7 @@ rmq_result_t rabbitmq_setup(rmq_client_t* client, rmq_error_t* error)
             if (result != RMQ_OK)
                 return result;
 
-            result = rmq_queue_bind(
-                client,
-                route->queue,
-                route->exchange,
-                route->routing_key,
-                error
-            );
+            result = rmq_queue_bind(client, route->queue, route->exchange, route->routing_key, error);
 
             if (result != RMQ_OK)
                 return result;
