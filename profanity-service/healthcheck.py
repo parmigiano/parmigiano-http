@@ -2,7 +2,7 @@ import os
 import sys
 import urllib.request
 
-port = os.getenv("PORT", "8082")
+port = os.getenv("PORT", "9191")
 
 try:
     with urllib.request.urlopen(f"http://127.0.0.1:{port}/health", timeout=2) as response:

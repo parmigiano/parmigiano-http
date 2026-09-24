@@ -41,12 +41,12 @@ services:
             context: ./nsfw-service
             dockerfile: Dockerfile
         environment:
-            PORT: '8081'
+            PORT: '9090'
             NSFW_THRESHOLD_PORN: '0.6'
             NSFW_THRESHOLD_HENTAI: '0.6'
             NSFW_THRESHOLD_SEXY: '0.8'
         ports:
-            - '8081:8081'
+            - '9090:9090'
         networks:
             parmigiano:
                 aliases:
@@ -71,11 +71,11 @@ services:
             context: ./profanity-service
             dockerfile: Dockerfile
         environment:
-            PORT: '8082'
+            PORT: '9191'
             PROFANITY_LANGUAGES: 'en,ru,de,sp'
             PROFANITY_MATCH_THRESHOLD: '0.95'
         ports:
-            - '8082:8082'
+            - '9191:9191'
         networks:
             parmigiano:
                 aliases:
@@ -126,11 +126,11 @@ services:
     http_server:
         restart: always
         build:
-            context: http-service
+            context: http-service/http-server
             dockerfile: Dockerfile
-        env_file: 'http-service/.env'
+        env_file: 'http-service/http-server/.env'
         volumes:
-            - ./http-service/logs:/app/logs
+            - ./http-service/http-server/logs:/app/logs
         ports:
             - '8080:8080'
         depends_on:
@@ -146,6 +146,33 @@ services:
             parmigiano:
                 aliases:
                     - http-server
+        security_opt:
+            - no-new-privileges:true
+        logging:
+            driver: json-file
+            options:
+                max-size: '10m'
+                max-file: '3'
+
+    auth_server:
+        restart: always
+        build:
+            context: http-service/auth-server
+            dockerfile: Dockerfile
+        env_file: 'http-service/auth-server/.env'
+        volumes:
+            - ./http-service/auth-server/logs:/app/logs
+        ports:
+            - '8081:8081'
+        depends_on:
+            profanity:
+                condition: service_healthy
+            http_server:
+                condition: service_started
+        networks:
+            parmigiano:
+                aliases:
+                    - auth-server
         security_opt:
             - no-new-privileges:true
         logging:

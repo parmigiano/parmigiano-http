@@ -7,7 +7,7 @@ import * as tf from '@tensorflow/tfjs';
 import { createRequire } from 'node:module';
 import { setWasmPaths } from '@tensorflow/tfjs-backend-wasm';
 
-const PORT = Number(process.env.PORT || 8081);
+const PORT = Number(process.env.PORT || 9090);
 const MAX_BYTES = 2 * 1024 * 1024;
 const THRESHOLDS = {
 	Porn: Number(process.env.NSFW_THRESHOLD_PORN || 0.6),

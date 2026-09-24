@@ -1,0 +1,1639 @@
+{
+  "openapi": "3.0.0",
+  "servers": [
+    {
+      "url": "http://localhost:8080/api/v2",
+      "description": "Local"
+    },
+    {
+      "url": "https://parmigianochat.ru/api/v2",
+      "description": "Production"
+    }
+  ],
+  "info": {
+    "title": "Parmigiano Chat API",
+    "version": "2.0.0",
+    "description": "This is a high-performance real-time messaging chat."
+  },
+  "paths": {
+    "/users/me": {
+      "get": {
+        "summary": "Get user me profile",
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Response language from the server (in which language the client is)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get me profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfoResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Update user information",
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Response language from the server (in which language the client is)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserUpdateProfile"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The profile has been updated",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/me/avatar": {
+      "patch": {
+        "summary": "Uploading a users avatar",
+        "description": "Updates the current users avatar via a file",
+        "tags": [
+          "Users"
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Response language from the server (in which language the client is)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              },
+              "description": "Upload a JPEG avatar"
+            },
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              },
+              "description": "Upload a PNG avatar"
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Avatar uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "https://s3.example.com/avatar/123.png"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Request error or duplicate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "There is no data to process"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string",
+                      "example": "Couldn't save the file"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/users/{user_uid}": {
+      "get": {
+        "summary": "Get profile user by user_uid",
+        "description": "Returns user profile",
+        "tags": [
+          "Users"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Response language from the server (in which language the client is)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          },
+          {
+            "name": "user_uid",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64",
+              "minimum": 0
+            },
+            "description": "UID пользователя"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User has been successfully get",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserInfoResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chats": {
+      "get": {
+        "summary": "Get chats history",
+        "description": "Returns paginated list of user chats with last message preview",
+        "tags": [
+          "Chats"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Response language from the server (in which language the client is)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Offset for pagination",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chats history",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatsHistoryResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chats/u/{username}": {
+      "get": {
+        "summary": "Get chat settings by username",
+        "description": "Returns chat settings such as custom background and block status",
+        "tags": [
+          "Chats"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Response language from the server (in which language the client is)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          },
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "description": "Username",
+            "schema": {
+              "type": "string",
+              "example": "ghost"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chat settings successfully retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSetting"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chats/{chat_id}": {
+      "get": {
+        "summary": "Get chat settings by chat id",
+        "description": "Returns chat settings such as custom background and block status",
+        "tags": [
+          "Chats"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Response language from the server (in which language the client is)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          },
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "description": "Chat id",
+            "schema": {
+              "type": "integer",
+              "format": "uint64",
+              "example": 123
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chat settings successfully retrieved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ChatSetting"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chats/{chat_id}/cbackground": {
+      "patch": {
+        "summary": "Uploading a custom background",
+        "description": "Updates the current custom background via a file",
+        "tags": [
+          "Chats"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Response language from the server (in which language the client is)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          },
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "description": "Chat id",
+            "schema": {
+              "type": "integer",
+              "format": "uint64",
+              "example": 123
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "image/jpeg": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              },
+              "description": "Upload a JPEG background"
+            },
+            "image/png": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              },
+              "description": "Upload a PNG background"
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Background uploaded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "https://s3.example.com/avatar/123.png"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chats/{chat_id}/translate": {
+      "post": {
+        "summary": "Chat translation supported languages (en, ru)",
+        "description": "Chat translation supported languages (en, ru)",
+        "tags": [
+          "Chats"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Response language from the server (in which language the client is)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          },
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "description": "Chat id",
+            "schema": {
+              "type": "integer",
+              "format": "uint64",
+              "example": 123
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatTranslate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Text translation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "This is translate with parmigiano chat!"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/chats/bot/ai": {
+      "post": {
+        "summary": "Built-in AI bot for communication in Parmigiano Chat",
+        "description": "Built-in AI bot for communication in Parmigiano Chat",
+        "tags": [
+          "Chats"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Response language from the server (in which language the client is)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatBotAi"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "AI Bots response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Hello!"
+                    }
+                  },
+                  "required": [
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authorization",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/media/chats/{chat_id}/upload": {
+      "post": {
+        "summary": "Upload raw file to chat",
+        "tags": [
+          "Media"
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Response language from the server (in which language the client is)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          },
+          {
+            "name": "chat_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "type": "string",
+                "format": "binary"
+              }
+            }
+          }
+        },
+        "400": {
+          "description": "Validation error",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            }
+          }
+        },
+        "500": {
+          "description": "Internal server error",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ErrorResponse"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups": {
+      "post": {
+        "summary": "Create a chat group",
+        "description": "Creates a new chat group for the authenticated user and adds chats to it.",
+        "tags": [
+          "Groups"
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Response language from the server (in which language the client is)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "chat_ids"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name of the group (max 20 chars)",
+                    "maxLength": 20
+                  },
+                  "chat_ids": {
+                    "type": "array",
+                    "description": "Array of chat IDs to add to the group",
+                    "items": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "maxItems": 65
+                  }
+                }
+              },
+              "example": {
+                "name": "My Chat Group",
+                "chat_ids": [
+                  101,
+                  102,
+                  103
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Group created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Group ID"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Group name"
+                    },
+                    "chat_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "format": "int64"
+                      },
+                      "description": "Array of chat IDs added to the group"
+                    }
+                  }
+                },
+                "example": {
+                  "id": 123,
+                  "name": "My Chat Group",
+                  "chat_ids": [
+                    101,
+                    102,
+                    103
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/groups/{group_id}": {
+      "put": {
+        "summary": "Edit a chat group",
+        "description": "Edit a chat group for the authenticated user and adds chats to it.",
+        "tags": [
+          "Groups"
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Response language from the server (in which language the client is)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "description": "Group id",
+            "schema": {
+              "type": "integer",
+              "format": "uint64",
+              "example": 123
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "name",
+                  "chat_ids"
+                ],
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "Name of the group (max 20 chars)",
+                    "maxLength": 20
+                  },
+                  "chat_ids": {
+                    "type": "array",
+                    "description": "Array of chat IDs to add to the group",
+                    "items": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "maxItems": 65
+                  }
+                }
+              },
+              "example": {
+                "name": "My Edit Chat Group",
+                "chat_ids": [
+                  101,
+                  102,
+                  103
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Group edited successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "integer",
+                      "format": "int64",
+                      "description": "Group ID"
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "Group name"
+                    },
+                    "chat_ids": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "format": "int64"
+                      },
+                      "description": "Array of chat IDs added to the group"
+                    }
+                  }
+                },
+                "example": {
+                  "id": 123,
+                  "name": "My Chat Group",
+                  "chat_ids": [
+                    101,
+                    102,
+                    103
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a chat group",
+        "description": "Delete a chat group for the authenticated user and delete chats in group.",
+        "tags": [
+          "Groups"
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Response language from the server (in which language the client is)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          },
+          {
+            "name": "group_id",
+            "in": "path",
+            "required": true,
+            "description": "Group id",
+            "schema": {
+              "type": "integer",
+              "format": "uint64",
+              "example": 123
+            }
+          }
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Group delete successfully"
+          },
+          "400": {
+            "description": "Validation error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "UserUpdateProfile": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 24,
+            "example": "john_doe"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 24,
+            "example": "John"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "john@example.com"
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 254,
+            "example": "+123456789012"
+          },
+          "overview": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 125,
+            "example": "Short description"
+          },
+          "username_visible": {
+            "type": "boolean",
+            "example": true
+          },
+          "phone_visible": {
+            "type": "boolean",
+            "example": false
+          },
+          "email_visible": {
+            "type": "boolean",
+            "example": true
+          },
+          "password": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 255,
+            "example": "strongpassword123"
+          }
+        }
+      },
+      "ChatPreview": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "uint64",
+            "example": 123
+          },
+          "name": {
+            "type": "string",
+            "example": "John Doe"
+          },
+          "username": {
+            "type": "string",
+            "example": "johndoe"
+          },
+          "avatar": {
+            "type": "string",
+            "example": "https://cdn.example.com/avatar.jpg",
+            "nullable": true
+          },
+          "user_uid": {
+            "type": "integer",
+            "format": "uint64",
+            "example": 987654321
+          },
+          "last_message": {
+            "type": "string",
+            "example": "Hey, how are you?"
+          },
+          "last_message_date": {
+            "type": "integer",
+            "description": "Unix timestamp",
+            "example": 1706323123
+          },
+          "unread_message_count": {
+            "type": "integer",
+            "example": 3
+          }
+        }
+      },
+      "ChatsHistoryResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChatPreview"
+            }
+          }
+        }
+      },
+      "ChatSetting": {
+        "type": "object",
+        "required": [
+          "name",
+          "username",
+          "email"
+        ],
+        "properties": {
+          "message": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "format": "uint64",
+                "example": 1
+              },
+              "created_at": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Unix timestamp",
+                "example": 1700000000
+              },
+              "updated_at": {
+                "type": "integer",
+                "format": "int64",
+                "description": "Unix timestamp",
+                "example": 1700001000
+              },
+              "chat_id": {
+                "type": "integer",
+                "format": "uint64",
+                "example": 123
+              },
+              "custom_background": {
+                "type": "string",
+                "example": "#ffffff"
+              },
+              "blocked": {
+                "type": "boolean",
+                "example": false
+              },
+              "who_blocked_uid": {
+                "type": "integer",
+                "format": "uint64",
+                "example": 0,
+                "description": "User UID who blocked the chat (0 if not blocked)"
+              }
+            },
+            "required": [
+              "id",
+              "created_at",
+              "updated_at",
+              "chat_id",
+              "blocked",
+              "who_blocked_uid"
+            ]
+          }
+        }
+      },
+      "UserInfo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "created_at": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "user_uid": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "avatar": {
+            "type": "string",
+            "nullable": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true
+          },
+          "username": {
+            "type": "string",
+            "nullable": true
+          },
+          "username_visible": {
+            "type": "boolean"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "nullable": true
+          },
+          "email_visible": {
+            "type": "boolean"
+          },
+          "email_confirm": {
+            "type": "boolean"
+          },
+          "phone": {
+            "type": "string",
+            "nullable": true
+          },
+          "phone_visible": {
+            "type": "boolean"
+          },
+          "overview": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "id",
+          "created_at",
+          "user_uid"
+        ]
+      },
+      "UserInfoResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/UserInfo"
+          }
+        }
+      },
+      "MessageResponse": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          }
+        }
+      },
+      "ChatTranslate": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 3000
+          }
+        }
+      },
+      "ChatBotAi": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "minLength": 0,
+            "maxLength": 3000
+          }
+        }
+      }
+    }
+  }
+}

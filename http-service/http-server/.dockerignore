@@ -1,0 +1,11 @@
+.build/
+.github/
+.nginx/
+.out/
+.systemd/
+.vscode/
+.idea/
+logs/
+log/
+script/
+scripts/

@@ -1,0 +1,15 @@
+- 0.3.0 (April 12, 2026) Latest
+
+Added CRUD group chats operations.
+Added upload media in chat messages.
+
+Fixed state cache when reload docker-compose in RedisDb.
+
+- 0.2.0 (March 28, 2026)
+
+Added translation of the message array (maximum: 15m. in one chat).
+The framework and handler for the AI assistant.
+
+- 0.1.1 (March 27, 2026)
+
+The registration logic has been changed.

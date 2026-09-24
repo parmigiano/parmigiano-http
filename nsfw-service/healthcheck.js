@@ -1,4 +1,4 @@
-const port = process.env.PORT || 8081;
+const port = process.env.PORT || 9090;
 
 const res = await fetch(`http://127.0.0.1:${port}/health`);
 
