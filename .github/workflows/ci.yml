@@ -27,8 +27,20 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends cppcheck
 
-      - name: Run cppcheck
-        working-directory: http-service
+      - name: Run cppcheck (http-server)
+        working-directory: http-service/http-server
+        run: |
+          cppcheck \
+            --std=c11 \
+            --enable=warning,performance,portability \
+            --suppress=missingIncludeSystem \
+            --inline-suppr \
+            --error-exitcode=1 \
+            -I include \
+            src/ include/
+
+      - name: Run cppcheck (auth-server)
+        working-directory: http-service/auth-server
         run: |
           # cppcheck 2.13 miscounts snprintf arguments when PRIu64 is
           # concatenated into a runtime format string in auth_handler.c.
@@ -53,9 +65,12 @@ jobs:
 
       - name: Validate JSON files
         run: |
-          python3 -m json.tool http-service/src/infra/locale/en.json >/dev/null
-          python3 -m json.tool http-service/src/infra/locale/ru.json >/dev/null
-          python3 -m json.tool http-service/docs/swagger/swagger_v2.json >/dev/null
+          python3 -m json.tool http-service/http-server/src/infra/locale/en.json >/dev/null
+          python3 -m json.tool http-service/http-server/src/infra/locale/ru.json >/dev/null
+          python3 -m json.tool http-service/http-server/docs/swagger/swagger_v2.json >/dev/null
+          python3 -m json.tool http-service/auth-server/src/infra/locale/en.json >/dev/null
+          python3 -m json.tool http-service/auth-server/src/infra/locale/ru.json >/dev/null
+          python3 -m json.tool http-service/auth-server/docs/swagger/swagger_v2.json >/dev/null
 
       - name: Check for committed secrets and build artifacts
         run: |
@@ -85,7 +100,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          dir="http-service/src/infra/store/postgres/migrations"
+          dir="http-service/http-server/src/storage/postgres/migrations"
           mapfile -t migrations < <(find "$dir" -maxdepth 1 -type f -name '*.sql' -printf '%f\n' | sort)
 
           if (( ${#migrations[@]} == 0 )); then
@@ -122,7 +137,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          migration_dir="http-service/src/infra/store/postgres/migrations/"
+          migration_dir="http-service/http-server/src/storage/postgres/migrations/"
           git fetch origin "$BASE_REF" --depth=1
 
           changed_existing=$(git diff --name-status "origin/$BASE_REF...HEAD" -- "$migration_dir" | awk '$1 !~ /^A/ {print}')

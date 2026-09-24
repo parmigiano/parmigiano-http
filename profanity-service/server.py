@@ -5,7 +5,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from badwords import ProfanityFilter
 
-PORT = int(os.getenv("PORT", "8082"))
+PORT = int(os.getenv("PORT", "9191"))
 LANGUAGES = [item.strip() for item in os.getenv("PROFANITY_LANGUAGES", "en,ru,de,sp").split(",") if item.strip()]
 THRESHOLD = float(os.getenv("PROFANITY_MATCH_THRESHOLD", "0.95"))
 MAX_BYTES = 64 * 1024

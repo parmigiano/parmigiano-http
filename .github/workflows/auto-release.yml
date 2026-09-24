@@ -67,8 +67,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract metadata
-        id: meta
+      - name: Extract http-server metadata
+        id: meta_http
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
@@ -77,13 +77,32 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},value=${{ needs.tag.outputs.version_tag }}
             type=raw,value=latest
 
-      - name: Build and push release image
+      - name: Extract auth-server metadata
+        id: meta_auth
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-auth
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.tag.outputs.version_tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.tag.outputs.version_tag }}
+            type=raw,value=latest
+
+      - name: Build and push http-server image
         uses: docker/build-push-action@v6
         with:
-          context: ./http-service
+          context: ./http-service/http-server
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.meta_http.outputs.tags }}
+          labels: ${{ steps.meta_http.outputs.labels }}
+          platforms: linux/amd64
+
+      - name: Build and push auth-server image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./http-service/auth-server
+          push: true
+          tags: ${{ steps.meta_auth.outputs.tags }}
+          labels: ${{ steps.meta_auth.outputs.labels }}
           platforms: linux/amd64
 
       - name: Create GitHub Release
@@ -97,7 +116,12 @@ jobs:
 
             ```bash
             docker pull ghcr.io/parmigiano/parmigiano-http:${{ needs.tag.outputs.version_tag }}
-            docker run --rm -p 8080:8080 --env-file .env ghcr.io/parmigiano/parmigiano-http:${{ needs.tag.outputs.version_tag }}
+            docker pull ghcr.io/parmigiano/parmigiano-http-auth:${{ needs.tag.outputs.version_tag }}
+
+            docker run --rm -p 8080:8080 --env-file http-service/http-server/.env.production \
+              ghcr.io/parmigiano/parmigiano-http:${{ needs.tag.outputs.version_tag }}
+            docker run --rm -p 8081:8081 --env-file http-service/auth-server/.env.production \
+              ghcr.io/parmigiano/parmigiano-http-auth:${{ needs.tag.outputs.version_tag }}
             ```
 
             ## Compose

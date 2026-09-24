@@ -1,33 +1,36 @@
 handlers:
   - changed-files:
-      - any-glob-to-any-file: src/handlers/**
+      - any-glob-to-any-file:
+          - http-service/*/src/handlers/**
 
 middlewares:
   - changed-files:
-      - any-glob-to-any-file: src/middlewares/**
+      - any-glob-to-any-file:
+          - http-service/*/src/middlewares/**
 
 database:
   - changed-files:
       - any-glob-to-any-file:
-          - src/infra/store/postgres/**
-          - include/postgres/**
+          - http-service/*/src/storage/postgres/**
+          - http-service/*/include/postgres/**
 
 redis:
   - changed-files:
       - any-glob-to-any-file:
-          - src/infra/store/redis/**
-          - include/redis/**
+          - http-service/*/src/storage/redis/**
+          - http-service/*/include/redis/**
 
 docker:
   - changed-files:
       - any-glob-to-any-file:
-          - Dockerfile
+          - http-service/*/Dockerfile
           - docker-compose*.yml
-          - .dockerignore
+          - http-service/*/.dockerignore
 
 api-docs:
   - changed-files:
-      - any-glob-to-any-file: docs/**
+      - any-glob-to-any-file:
+          - http-service/*/docs/**
 
 ci:
   - changed-files:
@@ -35,16 +38,25 @@ ci:
 
 infra:
   - changed-files:
-      - any-glob-to-any-file: src/infra/**
+      - any-glob-to-any-file:
+          - http-service/*/src/infra/**
 
 scripts:
   - changed-files:
       - any-glob-to-any-file: scripts/**
 
+auth-server:
+  - changed-files:
+      - any-glob-to-any-file: http-service/auth-server/**
+
+http-server:
+  - changed-files:
+      - any-glob-to-any-file: http-service/http-server/**
+
 core:
   - changed-files:
       - any-glob-to-any-file:
-          - src/main.c
-          - src/httpx.c
-          - src/routes/**
-          - include/**
+          - http-service/*/src/main.c
+          - http-service/*/src/httpx.c
+          - http-service/*/src/routes/**
+          - http-service/*/include/**

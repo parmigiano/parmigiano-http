@@ -19,7 +19,7 @@ Use a **conventional commit** title — it becomes the release version on merge:
 
 - [ ] PR title follows the table above
 - [ ] Docker image builds (`docker build .` or `docker compose -f docker-compose.dev.yml build`)
-- [ ] Database migrations added/updated if schema changed (`src/infra/store/postgres/migrations/`)
+- [ ] Database migrations added/updated if schema changed (`http-service/http-server/src/storage/postgres/migrations/`)
 - [ ] Swagger updated if API changed (`docs/swagger/swagger_v2.json`)
 - [ ] `.env.example` updated if new environment variables were added
 - [ ] Source is formatted (`make lin-format`)
