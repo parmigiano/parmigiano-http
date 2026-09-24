@@ -95,6 +95,8 @@ Swagger:
 Имя сервиса: `auth_server`  
 Зависит от: healthy `profanity`, started `http_server` (сначала должны пройти миграции).
 
+Запуск через **[parmigiano-infra](https://github.com/parmigiano/parmigiano-infra)** (`make up-http ENV=dev` или `make up ENV=dev`), не compose из этого репозитория.
+
 ## Частые ошибки
 
 1. Разные `SUPER_SECRET_KEY`/`IV` у auth и http → сессии с auth не работают на http.

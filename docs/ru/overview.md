@@ -3,6 +3,53 @@
 Этот репозиторий — HTTP-backend **Parmigiano Chat**.  
 Он разделён на несколько процессов: HTTP, Redis, Postgres, RabbitMQ, S3.
 
+## Как запускать (через infra, не отсюда)
+
+Полный стек поднимайте из **[parmigiano-infra](https://github.com/parmigiano/parmigiano-infra)**.  
+Там живут Postgres, Redis, общая Docker-сеть `parmigiano-net` и оркестрация HTTP + TCP.
+
+Репозитории должны лежать **рядом**:
+
+```
+parmigiano-infra/     # запускать отсюда
+parmigiano-http/      # этот репозиторий
+parmigiano-tcp/
+```
+
+Дальше:
+
+```bash
+cd parmigiano-infra
+make up ENV=dev          # infra + HTTP + TCP
+# или только HTTP, когда infra уже поднята:
+make up-infra
+make up-http ENV=dev
+```
+
+Полезные команды (всегда из `parmigiano-infra`):
+
+| Команда | Смысл |
+|---------|--------|
+| `make up ENV=dev` | Сеть `parmigiano-net`, Postgres/Redis, затем HTTP и TCP |
+| `make up-http ENV=dev` | Compose этого репо (`docker-compose.dev.yml`) |
+| `make logs-http ENV=dev` | Логи HTTP-стека |
+| `make down ENV=dev` | Остановить стеки (тома сохраняются) |
+| `make up ENV=prod` | То же с `docker-compose.prod.yml` |
+
+Не используйте `docker compose -f docker-compose.dev.yml up` из `parmigiano-http` как обычный способ запуска: Postgres/Redis и сеть поднимает infra. Compose-файлы здесь нужны, чтобы infra их вызывала.
+
+Env-файлы готовьте **в этом репо** до `make up-http`:
+
+```bash
+cp http-service/http-server/.env.example http-service/http-server/.env
+cp http-service/auth-server/.env.example http-service/auth-server/.env
+```
+
+Swagger после старта:
+
+- Auth: `http://localhost:8081/api/v2/doc.api/swagger/gui`
+- HTTP: `http://localhost:8080/api/v2/doc.api/swagger/gui`
+
 ## Структура репозитория
 
 ```
@@ -56,32 +103,6 @@ Auth-server также ходит в **profanity** (имя/username при ре�
 - **S3** — аватары / приватные медиа.
 - **SMTP** — письма с кодом (auth-server).
 
-## Локальный запуск (Docker Compose)
-
-1. Создайте env-файлы:
-
-```bash
-cp http-service/http-server/.env.example http-service/http-server/.env
-cp http-service/auth-server/.env.example http-service/auth-server/.env
-```
-
-2. Сеть Docker:
-
-```bash
-docker network create parmigiano-net
-```
-
-3. Поднять стек:
-
-```bash
-docker compose -f docker-compose.dev.yml up --build
-```
-
-4. Swagger:
-
-- Auth: `http://localhost:8081/api/v2/doc.api/swagger/gui`
-- HTTP: `http://localhost:8080/api/v2/doc.api/swagger/gui`
-
 ## Заметки по окружению
 
 - `TYPE=DEV` — локальный режим (CORS, geo отключён, пустые NSFW/PROFANITY могут пропускаться).
@@ -99,6 +120,7 @@ docker compose -f docker-compose.dev.yml up --build
 | Языки / порог мата | `profanity-service` + env в compose |
 | Публичный роутинг | `.nginx/nginx.conf` |
 | CI / образы | `.github/workflows/*` |
+| Старт Postgres / Redis / всего стека | [parmigiano-infra](https://github.com/parmigiano/parmigiano-infra) |
 
 ## Дальше читать
 

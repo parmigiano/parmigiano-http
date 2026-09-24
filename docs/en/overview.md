@@ -3,6 +3,53 @@
 This repository is the HTTP backend for **Parmigiano Chat**.  
 It is split into several processes that talk over HTTP / Redis / Postgres / RabbitMQ / S3.
 
+## How to run (use infra, not this repo)
+
+Start everything from **[parmigiano-infra](https://github.com/parmigiano/parmigiano-infra)**.  
+That repo owns Postgres, Redis, the shared Docker network `parmigiano-net`, and orchestrates HTTP + TCP.
+
+Clone the three repos as **siblings**:
+
+```
+parmigiano-infra/     # start here
+parmigiano-http/      # this repository
+parmigiano-tcp/
+```
+
+Then:
+
+```bash
+cd parmigiano-infra
+make up ENV=dev          # infra + HTTP + TCP
+# or only HTTP after infra is up:
+make up-infra
+make up-http ENV=dev
+```
+
+Useful commands (always from `parmigiano-infra`):
+
+| Command | Meaning |
+|---------|---------|
+| `make up ENV=dev` | Create `parmigiano-net`, start Postgres/Redis, then HTTP and TCP |
+| `make up-http ENV=dev` | Start this repo’s compose (`docker-compose.dev.yml`) |
+| `make logs-http ENV=dev` | Follow HTTP stack logs |
+| `make down ENV=dev` | Stop stacks (volumes kept) |
+| `make up ENV=prod` | Same flow with `docker-compose.prod.yml` |
+
+Do **not** run `docker compose -f docker-compose.dev.yml up` from `parmigiano-http` as the normal workflow: Postgres/Redis and the network come from infra. Compose files in this repo exist so infra can call them.
+
+Prepare env files **in this repo** before `make up-http`:
+
+```bash
+cp http-service/http-server/.env.example http-service/http-server/.env
+cp http-service/auth-server/.env.example http-service/auth-server/.env
+```
+
+Swagger after start:
+
+- Auth: `http://localhost:8081/api/v2/doc.api/swagger/gui`
+- HTTP: `http://localhost:8080/api/v2/doc.api/swagger/gui`
+
 ## Repository layout
 
 ```
@@ -56,32 +103,6 @@ Auth-server also calls **profanity** (registration / profile-like text fields) a
 - **S3** — avatars / private media.
 - **SMTP** — confirmation emails (auth-server).
 
-## Local start (Docker Compose)
-
-1. Create env files:
-
-```bash
-cp http-service/http-server/.env.example http-service/http-server/.env
-cp http-service/auth-server/.env.example http-service/auth-server/.env
-```
-
-2. Ensure Docker network exists:
-
-```bash
-docker network create parmigiano-net
-```
-
-3. Start stack:
-
-```bash
-docker compose -f docker-compose.dev.yml up --build
-```
-
-4. Swagger:
-
-- Auth: `http://localhost:8081/api/v2/doc.api/swagger/gui`
-- HTTP: `http://localhost:8080/api/v2/doc.api/swagger/gui`
-
 ## Environment notes
 
 - `TYPE=DEV` — local/dev behavior (CORS, geo middleware bypass, empty NSFW/PROFANITY URLs may be skipped).
@@ -99,6 +120,7 @@ docker compose -f docker-compose.dev.yml up --build
 | Bad-words languages / threshold | `profanity-service` + compose env |
 | Public routing | `.nginx/nginx.conf` |
 | CI / images | `.github/workflows/*` |
+| Start Postgres / Redis / full stack | [parmigiano-infra](https://github.com/parmigiano/parmigiano-infra) |
 
 ## Next reading
 

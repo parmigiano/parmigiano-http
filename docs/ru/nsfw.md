@@ -54,10 +54,12 @@ curl -s -F "image=@photo.jpg" http://localhost:9090/moderate
 
 ## Локальная разработка
 
-Сервис compose: `nsfw`
+Сервис compose: `nsfw` (в HTTP-compose этого репо).  
+HTTP-стек поднимайте из **[parmigiano-infra](https://github.com/parmigiano/parmigiano-infra)**:
 
 ```bash
-docker compose -f docker-compose.dev.yml up nsfw
+cd ../parmigiano-infra
+make up-http ENV=dev
 ```
 
 Healthcheck ждёт готовности модели (первый старт может занять десятки секунд).

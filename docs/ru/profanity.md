@@ -69,10 +69,12 @@ Env: `PROFANITY_URL=http://profanity:9191`
 
 ## Локальная разработка
 
-Сервис compose: `profanity`
+Сервис compose: `profanity` (в HTTP-compose этого репо).  
+Запуск из **[parmigiano-infra](https://github.com/parmigiano/parmigiano-infra)**:
 
 ```bash
-docker compose -f docker-compose.dev.yml up profanity
+cd ../parmigiano-infra
+make up-http ENV=dev
 ```
 
 Без Docker: `PORT=9191` и `python server.py` в `profanity-service/`.

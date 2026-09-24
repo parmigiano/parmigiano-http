@@ -69,10 +69,12 @@ Helpers:
 
 ## Local development
 
-Compose service: `profanity`
+Compose service: `profanity` (part of this repo’s HTTP compose).  
+Start from **[parmigiano-infra](https://github.com/parmigiano/parmigiano-infra)**:
 
 ```bash
-docker compose -f docker-compose.dev.yml up profanity
+cd ../parmigiano-infra
+make up-http ENV=dev
 ```
 
 Without Docker: set `PORT=9191` and run `python server.py` in `profanity-service/`.

@@ -54,10 +54,12 @@ Results are mapped to i18n keys like `nsfw.rejected`, `nsfw.timeout`, etc.
 
 ## Local development
 
-Compose service: `nsfw`
+Compose service: `nsfw` (part of this repo’s HTTP compose).  
+Start the HTTP stack from **[parmigiano-infra](https://github.com/parmigiano/parmigiano-infra)**:
 
 ```bash
-docker compose -f docker-compose.dev.yml up nsfw
+cd ../parmigiano-infra
+make up-http ENV=dev
 ```
 
 Healthcheck waits until the model is ready (can take tens of seconds on first start).

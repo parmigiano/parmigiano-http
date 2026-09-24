@@ -1,8 +1,12 @@
 # Parmigiano HTTP — Documentation / Документация
 
-Developer guides for the backend services in this repository.
+Developer guides for the HTTP backend in this repository.
 
-Руководства для разработчиков по backend-сервисам этого репозитория.
+Руководства по HTTP-backend этого репозитория.
+
+**Do not start the stack from here.** Shared Postgres/Redis, the Docker network, and the full product start live in **[parmigiano-infra](https://github.com/parmigiano/parmigiano-infra)**. This repo only contains HTTP services and compose files that infra calls.
+
+**Не поднимайте стек отсюда.** Общие Postgres/Redis, Docker-сеть и полный запуск продукта живут в **[parmigiano-infra](https://github.com/parmigiano/parmigiano-infra)**. Здесь только HTTP-сервисы и compose, которые вызывает infra.
 
 ## English
 

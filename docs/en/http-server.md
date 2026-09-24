@@ -90,6 +90,8 @@ Do not rely on this in production.
 Service name: `http_server`  
 Depends on: healthy `nsfw`, `profanity`, `rabbitmq`; started `libretranslate`.
 
+Start via **[parmigiano-infra](https://github.com/parmigiano/parmigiano-infra)** (`make up-http ENV=dev` or `make up ENV=dev`). Postgres and Redis come from infra, not from this repo.
+
 ## Common pitfalls
 
 1. Editing migrations already applied in shared DB — CI forbids mutating old files; add a new migration.

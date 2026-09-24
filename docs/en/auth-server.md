@@ -95,6 +95,8 @@ In production an empty URL is treated as unavailable.
 Service name: `auth_server`  
 Depends on: healthy `profanity`, started `http_server` (so migrations exist first).
 
+Start via **[parmigiano-infra](https://github.com/parmigiano/parmigiano-infra)** (`make up-http ENV=dev` or `make up ENV=dev`), not by compose from this repo.
+
 ## Common pitfalls
 
 1. Different `SUPER_SECRET_KEY`/`IV` between auth and http → sessions from auth invalid on http.

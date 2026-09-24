@@ -90,6 +90,8 @@ Swagger GUI: `http://localhost:8080/api/v2/doc.api/swagger/gui`
 Имя сервиса: `http_server`  
 Зависит от: healthy `nsfw`, `profanity`, `rabbitmq`; started `libretranslate`.
 
+Запуск через **[parmigiano-infra](https://github.com/parmigiano/parmigiano-infra)** (`make up-http ENV=dev` или `make up ENV=dev`). Postgres и Redis поднимает infra, не этот репозиторий.
+
 ## Частые ошибки
 
 1. Править уже применённые миграции — CI запрещает; добавляйте новый файл.
