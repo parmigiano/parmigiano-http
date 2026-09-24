@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define FOLDER_SQL_MIGRATIONS "./src/infra/store/postgres/migrations"
+#define FOLDER_SQL_MIGRATIONS "./src/storage/postgres/migrations"
 #define MIGRATION_LOCK_ID 73490127
 
 static char* read_file_migrate(const char* path)
