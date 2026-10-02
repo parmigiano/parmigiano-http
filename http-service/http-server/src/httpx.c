@@ -134,7 +134,6 @@ void http_init(void)
 	cHTTPX_MiddlewareLogging(app_context->moderation);
     cHTTPX_MiddlewareRateLimiter(app_context->http, 5, 1);
     cHTTPX_MiddlewareUse(app_context->http, geoip_block_middleware);
-    // cHTTPX_MiddlewareUse(email_confirmed_middleware);
 
     /* Initial routes */
     http_routes(app_context->http);

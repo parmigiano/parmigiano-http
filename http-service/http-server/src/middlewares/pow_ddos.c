@@ -17,12 +17,7 @@ static int pow_ddos_verify(chttpx_request_t* req);
 
 chttpx_middleware_result_t pow_ddos_middleware(chttpx_request_t* req, chttpx_response_t* res)
 {
-    /* Free routes */
-    if (strstr(req->path, "doc.api/swagger") != NULL)
-    {
-        return next;
-    }
-
+    /* Free bypass for clients that skip PoW in debug */
     const char* x_debug = cHTTPX_HeaderGet(req, "X-Debug");
     if (x_debug && strcmp(x_debug, "1") == 0)
     {

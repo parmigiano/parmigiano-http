@@ -58,6 +58,7 @@ void http_routes(chttpx_serv_t* server)
 
     /* Media routes */
     chttpx_router_t media = cHTTPX_RouteGroup(&api, "/media");
+    cHTTPX_RouterUse(&media, pow_ddos_middleware);
     cHTTPX_RouterUse(&media, authenticate_middleware);
 
     chttpx_route_t* media_upload_route = cHTTPX_Post(&media, "/chats/{chat_id}/upload", media_upload_in_chat_handler_v2);

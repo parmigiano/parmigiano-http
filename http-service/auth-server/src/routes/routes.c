@@ -15,6 +15,7 @@ void http_routes(chttpx_serv_t* server)
 
     /* Auth routes */
     chttpx_router_t auth = cHTTPX_RouteGroup(&api, "/auth");
+    cHTTPX_RouterUse(&auth, pow_ddos_middleware);
 
     cHTTPX_Post(&auth, "/login", auth_login_handler_v2);
     cHTTPX_Post(&auth, "/create", auth_create_handler_v2);

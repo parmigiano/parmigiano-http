@@ -93,21 +93,19 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release.outputs.tag }}
-          name: parmigiano-http ${{ steps.release.outputs.tag }}
+          name: http ${{ steps.release.outputs.tag }}
           generate_release_notes: true
           body: |
-            ## Docker
+            ## Parmigiano HTTP
+
+            HTTP backend for Parmigiano Chat (auth-server, http-server, NSFW, profanity).
+
+            Start the stack from [parmigiano-infra](https://github.com/parmigiano/parmigiano-infra), not from this repository.
 
             ```bash
-            docker pull ghcr.io/parmigiano/parmigiano-http:${{ steps.release.outputs.tag }}
-            docker pull ghcr.io/parmigiano/parmigiano-http-auth:${{ steps.release.outputs.tag }}
-
-            docker run --rm -p 8080:8080 --env-file http-service/http-server/.env.production \
-              ghcr.io/parmigiano/parmigiano-http:${{ steps.release.outputs.tag }}
-            docker run --rm -p 8081:8081 --env-file http-service/auth-server/.env.production \
-              ghcr.io/parmigiano/parmigiano-http-auth:${{ steps.release.outputs.tag }}
+            # repos as siblings: parmigiano-infra, parmigiano-http, parmigiano-tcp
+            cd parmigiano-infra
+            make up ENV=dev
             ```
 
-            ## Compose
-
-            See [docker-compose.prod.yml](https://github.com/parmigiano/parmigiano-http/blob/main/docker-compose.prod.yml) for the full production stack.
+            Developer docs: [docs/README.md](https://github.com/parmigiano/parmigiano-http/blob/main/docs/README.md).
