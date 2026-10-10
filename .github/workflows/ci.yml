@@ -38,7 +38,8 @@ jobs:
             --error-exitcode=1 \
             -I include \
             -I ../share/postgres/include \
-            src/ include/ ../share/postgres/src ../share/postgres/include
+            -I ../share/redis/include \
+            src/ include/ ../share/postgres/src ../share/postgres/include ../share/redis/src ../share/redis/include
 
       - name: Run cppcheck (auth-server)
         working-directory: http-service/auth-server
@@ -54,7 +55,37 @@ jobs:
             --error-exitcode=1 \
             -I include \
             -I ../share/postgres/include \
-            src/ include/
+            -I ../share/redis/include \
+            src/ include/ ../share/redis/src ../share/redis/include
+
+  redis-pool-test:
+    name: Redis pool compile and concurrency tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install hiredis
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libhiredis-dev
+
+      - name: Compile and run pool tests
+        run: |
+          gcc -std=c11 -Wall -Wextra -Werror -O2 -pthread \
+            -Ihttp-service/share/redis/tests/stubs \
+            -Ihttp-service/share/redis/include \
+            http-service/share/redis/src/pool.c \
+            http-service/share/redis/tests/test_pool.c \
+            -lhiredis -o /tmp/redis-pool-test
+          /tmp/redis-pool-test
 
   repository-validation:
     name: Repository validation
