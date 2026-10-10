@@ -112,7 +112,8 @@ static db_result_t db_user_create_tx(db_t* db, void* arg)
     return db_user_profile_active_create(db, args->user_active);
 }
 
-db_result_t db_user_create(db_t* db, user_core_t* user_core, user_profile_t* user_profile, user_profile_access_t* user_profile_access, user_active_t* user_active)
+db_result_t db_user_create(db_t* db, user_core_t* user_core, user_profile_t* user_profile, user_profile_access_t* user_profile_access,
+                           user_active_t* user_active)
 {
     db_user_create_args_t args = {
         .user_core = user_core,
@@ -221,7 +222,17 @@ void db_user_info_free(user_info_t* user)
 
 user_core_t* db_user_core_get_by_email(db_t* db, char* email)
 {
+    user_core_t* user = NULL;
+    db_user_core_lookup_by_email(db, email, &user);
+    return user;
+}
+
+db_result_t db_user_core_lookup_by_email(db_t* db, char* email, user_core_t** out_user)
+{
     db_result_set_t* rc = NULL;
+
+    if (out_user)
+        *out_user = NULL;
 
     const char* query = "SELECT * FROM user_cores WHERE email = $1 LIMIT 1";
     const char* params[1] = {email};
@@ -231,13 +242,13 @@ user_core_t* db_user_core_get_by_email(db_t* db, char* email)
     {
         logger_error("db_user_core_get_by_email email={%s}: failed to exec sql: %s", email, db_error_message(db));
         free_result_set(rc);
-        return NULL;
+        return result;
     }
 
     if (!rc || rc->n_rows == 0)
     {
         free_result_set(rc);
-        return NULL;
+        return DB_OK;
     }
 
     user_core_t* user = malloc(sizeof(user_core_t));
@@ -248,7 +259,7 @@ user_core_t* db_user_core_get_by_email(db_t* db, char* email)
         fprintf(stderr, "malloc failed\n");
 
         free_result_set(rc);
-        return NULL;
+        return DB_ERROR;
     }
 
     memset(user, 0, sizeof(user_core_t));
@@ -263,7 +274,17 @@ user_core_t* db_user_core_get_by_email(db_t* db, char* email)
 
     free_result_set(rc);
 
-    return user;
+    if (!out_user)
+    {
+        free(user->email);
+        free(user->password);
+        free(user);
+        return DB_OK;
+    }
+
+    *out_user = user;
+
+    return DB_OK;
 }
 
 user_core_t* db_user_core_get_by_uid(db_t* db, uint64_t user_uid)

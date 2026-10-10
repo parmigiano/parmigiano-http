@@ -42,7 +42,8 @@ RUN mkdir -p /usr/local/share/GeoIP \
 
 WORKDIR /app
 
-COPY . .
+COPY http-server/ .
+COPY share /share
 
 RUN make clean && make TARGET=server-http lin
 

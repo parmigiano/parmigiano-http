@@ -1,7 +1,7 @@
 #ifndef POSTGRES_USER_BLOCKS_H
 #define POSTGRES_USER_BLOCKS_H
 
-#include "postgres.h"
+#include "postgres/postgres.h"
 
 #include <stdbool.h>
 #include <stdint.h>

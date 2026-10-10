@@ -56,7 +56,8 @@ Swagger after start:
 parmigiano-http/
 ├── http-service/
 │   ├── auth-server/     # authentication API (C)
-│   └── http-server/     # main product API (C)
+│   ├── http-server/     # main product API (C)
+│   └── share/postgres/  # shared Postgres pool and query helpers
 ├── nsfw-service/        # image moderation sidecar (Node.js)
 ├── profanity-service/   # text moderation sidecar (Python)
 ├── docker-compose.dev.yml
@@ -98,7 +99,7 @@ Auth-server also calls **profanity** (registration / profile-like text fields) a
 
 ## Shared dependencies
 
-- **PostgreSQL** — users, chats, messages, moderation tables. Each process keeps its own connection pool (`DB_MAX_OPEN`, default 16). Migrations are owned by **http-server only**. Auth-server connects to the same DB but does **not** run migrations.
+- **PostgreSQL** — users, chats, messages, moderation tables. Each process keeps its own connection pool (`DB_MAX_OPEN`, default 16). Pool and query helpers live in `http-service/share/postgres`. Table access stays in each server's `storage/postgres/store`. Migrations are owned by **http-server only**. Auth-server connects to the same DB but does **not** run migrations.
 - **Redis** — sessions, email verify codes, rate limits, email-confirm flags.
 - **S3** — avatars / private media.
 - **SMTP** — confirmation emails (auth-server).
@@ -116,6 +117,7 @@ Auth-server also calls **profanity** (registration / profile-like text fields) a
 |------|--------|
 | Auth routes / handlers | `http-service/auth-server` |
 | Users / chats / media | `http-service/http-server` |
+| Shared Postgres pool / queries | `http-service/share/postgres` |
 | Image thresholds | `nsfw-service` + compose env |
 | Bad-words languages / threshold | `profanity-service` + compose env |
 | Public routing | `.nginx/nginx.conf` |

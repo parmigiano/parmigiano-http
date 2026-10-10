@@ -1,7 +1,7 @@
 #ifndef POSTGRES_CHATS_H
 #define POSTGRES_CHATS_H
 
-#include "postgres.h"
+#include "postgres/postgres.h"
 
 #include <time.h>
 #include <stdint.h>

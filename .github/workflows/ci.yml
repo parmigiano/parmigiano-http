@@ -37,7 +37,8 @@ jobs:
             --inline-suppr \
             --error-exitcode=1 \
             -I include \
-            src/ include/
+            -I ../share/postgres/include \
+            src/ include/ ../share/postgres/src ../share/postgres/include
 
       - name: Run cppcheck (auth-server)
         working-directory: http-service/auth-server
@@ -52,6 +53,7 @@ jobs:
             --inline-suppr \
             --error-exitcode=1 \
             -I include \
+            -I ../share/postgres/include \
             src/ include/
 
   repository-validation:

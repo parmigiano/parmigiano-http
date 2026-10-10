@@ -1,4 +1,4 @@
-#include "postgres/postgres.h"
+#include "postgres/migrate.h"
 
 #include "logger.h"
 

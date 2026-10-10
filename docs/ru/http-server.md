@@ -97,4 +97,4 @@ Swagger GUI: `http://localhost:8080/api/v2/doc.api/swagger/gui`
 1. Править уже применённые миграции — CI запрещает; добавляйте новый файл.
 2. Ждать `/auth` на `:8080` — он на auth-server `:8081`.
 3. Разный secret у auth/http → middleware отклоняет сессии.
-4. Собирать старый context `http-service/` — нужен `http-service/http-server`.
+4. Собирать только context `http-service/http-server` — общий Postgres-код лежит в `http-service/share`, context образа — `http-service`, Dockerfile — `http-server/Dockerfile`.

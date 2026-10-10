@@ -1,7 +1,7 @@
 #ifndef POSTGRES_GROUP_CHATS_H
 #define POSTGRES_GROUP_CHATS_H
 
-#include "postgres.h"
+#include "postgres/postgres.h"
 
 /* table. GROUP_CHATS */
 /* ------------------ */

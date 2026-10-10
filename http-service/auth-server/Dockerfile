@@ -42,7 +42,8 @@ RUN mkdir -p /usr/local/share/GeoIP \
 
 WORKDIR /app
 
-COPY . .
+COPY auth-server/ .
+COPY share /share
 
 RUN make clean && make TARGET=server-auth lin
 

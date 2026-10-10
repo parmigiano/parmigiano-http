@@ -1,7 +1,7 @@
 #ifndef POSTGRES_USERS_H
 #define POSTGRES_USERS_H
 
-#include "postgres.h"
+#include "postgres/postgres.h"
 
 #include <time.h>
 #include <stdlib.h>

@@ -97,4 +97,4 @@ Start via **[parmigiano-infra](https://github.com/parmigiano/parmigiano-infra)**
 1. Editing migrations already applied in shared DB — CI forbids mutating old files; add a new migration.
 2. Expecting `/auth` on `:8080` — moved to auth-server `:8081`.
 3. Auth/http secret mismatch → middleware rejects sessions.
-4. Building old context `http-service/` — correct context is `http-service/http-server`.
+4. Building with context `http-service/http-server` alone — shared Postgres code is in `http-service/share`, so the image context is `http-service` and the Dockerfile is `http-server/Dockerfile`.

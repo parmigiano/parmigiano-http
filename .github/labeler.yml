@@ -13,6 +13,7 @@ database:
       - any-glob-to-any-file:
           - http-service/*/src/storage/postgres/**
           - http-service/*/include/postgres/**
+          - http-service/share/postgres/**
 
 redis:
   - changed-files:
@@ -25,6 +26,7 @@ docker:
       - any-glob-to-any-file:
           - http-service/*/Dockerfile
           - docker-compose*.yml
+          - http-service/.dockerignore
           - http-service/*/.dockerignore
 
 api-docs:

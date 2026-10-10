@@ -1,7 +1,7 @@
 #ifndef POSTGRES_VALIDATE_H
 #define POSTGRES_VALIDATE_H
 
-#include "postgres.h"
+#include "postgres/postgres.h"
 
 #include <libchttpx/libchttpx.h>
 

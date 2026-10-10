@@ -1,7 +1,7 @@
 #ifndef POSTGRES_MODERATION_H
 #define POSTGRES_MODERATION_H
 
-#include "postgres.h"
+#include "postgres/postgres.h"
 
 #include <stdbool.h>
 #include <stdint.h>

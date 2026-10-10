@@ -97,8 +97,8 @@ services:
     http_server:
         restart: always
         build:
-            context: http-service/http-server
-            dockerfile: Dockerfile
+            context: http-service
+            dockerfile: http-server/Dockerfile
         env_file: 'http-service/http-server/.env'
         volumes:
             - ./http-service/http-server/logs:/app/logs
@@ -126,8 +126,8 @@ services:
     auth_server:
         restart: always
         build:
-            context: http-service/auth-server
-            dockerfile: Dockerfile
+            context: http-service
+            dockerfile: auth-server/Dockerfile
         env_file: 'http-service/auth-server/.env'
         volumes:
             - ./http-service/auth-server/logs:/app/logs

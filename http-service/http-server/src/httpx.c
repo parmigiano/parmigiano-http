@@ -6,7 +6,7 @@
 #include "utilities.h"
 #include "middlewarex.h"
 #include "redis/redis.h"
-#include "postgres/postgres.h"
+#include "postgres/migrate.h"
 
 #include <string.h>
 #include <maxminddb.h>

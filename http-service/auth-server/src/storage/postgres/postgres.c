@@ -1,1 +1,0 @@
-/* Database pool implementation is in pool.c. */

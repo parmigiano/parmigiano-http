@@ -1,7 +1,7 @@
 #ifndef POSTGRES_USERS_H
 #define POSTGRES_USERS_H
 
-#include "postgres.h"
+#include "postgres/postgres.h"
 
 #include <time.h>
 #include <stdlib.h>
@@ -121,6 +121,8 @@ user_info_t* db_user_info_get_by_uid(db_t* db, uint64_t user_uid);
 void db_user_info_free(user_info_t* user);
 /* Get user_core by email */
 user_core_t* db_user_core_get_by_email(db_t* db, char *email);
+/* DB_OK and *out_user NULL means the email is not registered. */
+db_result_t db_user_core_lookup_by_email(db_t* db, char* email, user_core_t** out_user);
 /* Get user_core by user_uid */
 user_core_t* db_user_core_get_by_uid(db_t* db, uint64_t user_uid);
 /* Update user email confirm by email */

@@ -1,0 +1,11 @@
+**/.build
+**/.out
+**/.github
+**/.nginx
+**/.systemd
+**/.vscode
+**/.idea
+**/logs
+**/log
+**/script
+**/scripts
