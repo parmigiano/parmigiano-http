@@ -1,155 +1,200 @@
-#include "postgres/postgres.h"
+#include "postgres/db_internal.h"
 
 #include "logger.h"
 
-#include <pthread.h>
+#include <stdlib.h>
+#include <string.h>
 
-static pthread_mutex_t pg_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-PGresult* db_exec(PGconn* conn, const char* query)
+static int connection_failed(PGconn* conn)
 {
-    pthread_mutex_lock(&pg_mutex);
-    PGresult* result = PQexec(conn, query);
-    pthread_mutex_unlock(&pg_mutex);
-    return result;
+    return !conn || PQstatus(conn) != CONNECTION_OK;
 }
 
-PGresult* db_exec_params(PGconn* conn, const char* query, int n_params, const char** params)
+static db_result_t map_status(PGresult* result)
 {
-    pthread_mutex_lock(&pg_mutex);
+    if (!result)
+        return DB_ERROR;
+
+    ExecStatusType status = PQresultStatus(result);
+    if (status == PGRES_COMMAND_OK || status == PGRES_TUPLES_OK)
+    {
+        db_set_last(DB_OK, "");
+        return DB_OK;
+    }
+
+    const char* sqlstate = PQresultErrorField(result, PG_DIAG_SQLSTATE);
+    const char* message = PQresultErrorMessage(result);
+
+    db_result_t code = (sqlstate && strcmp(sqlstate, "57014") == 0) ? DB_TIMEOUT : DB_ERROR;
+    db_set_last(code, message);
+
+    return code;
+}
+
+static PGresult* run_params(db_t* db, const char* query, int n_params, const char** params, int* discard)
+{
+    PGconn* conn = NULL;
+
+    int slot = -1;
+    int owned = 0;
+
+    db_result_t checked = db_checkout(db, &conn, &slot, &owned);
+    if (checked != DB_OK)
+    {
+        *discard = 0;
+        return NULL;
+    }
+
     PGresult* result = PQexecParams(conn, query, n_params, NULL, params, NULL, NULL, 0);
-    pthread_mutex_unlock(&pg_mutex);
+    *discard = connection_failed(conn);
+    if (!result)
+    {
+        db_set_last(DB_ERROR, PQerrorMessage(conn));
+        logger_error("execute_sql: database error: %s", PQerrorMessage(conn));
+    }
+
+    db_checkin(db, slot, owned, *discard);
     return result;
 }
 
-db_result_t execute_sql(PGconn* conn, const char* query, const char** params, int n_params)
+static PGresult* run_query(db_t* db, const char* query, int* discard)
 {
-    if (!conn || !query)
-        return DB_ERROR;
+    PGconn* conn = NULL;
+    int slot = -1;
+    int owned = 0;
 
-    int timeout_sec = 5;
-
-    time_t start = time(NULL);
-
-    while (1)
+    db_result_t checked = db_checkout(db, &conn, &slot, &owned);
+    if (checked != DB_OK)
     {
-        PGresult* result = db_exec_params(conn, query, n_params, params);
-        if (!result)
-            return DB_ERROR;
-
-        ExecStatusType status = PQresultStatus(result);
-
-        if (status == PGRES_COMMAND_OK)
-        {
-            PQclear(result);
-            return DB_OK;
-        }
-
-        if (status == PGRES_FATAL_ERROR)
-        {
-            const char* err = PQresultErrorMessage(result);
-
-            logger_error("execute_sql: database error: %s", err);
-            PQclear(result);
-
-            return DB_ERROR;
-        }
-
-        PQclear(result);
-
-        if (difftime(time(NULL), start) > timeout_sec)
-        {
-            return DB_TIMEOUT;
-        }
+        *discard = 0;
+        return NULL;
     }
+
+    PGresult* result = PQexec(conn, query);
+    *discard = connection_failed(conn);
+    if (!result)
+    {
+        db_set_last(DB_ERROR, PQerrorMessage(conn));
+        logger_error("execute_sql: database error: %s", PQerrorMessage(conn));
+    }
+
+    db_checkin(db, slot, owned, *discard);
+    return result;
 }
 
-db_result_t execute_select(PGconn* conn, const char* query, const char** params, int n_params, db_result_set_t** out_result)
+PGresult* db_exec(db_t* db, const char* query)
 {
-    if (!conn || !query || !out_result)
-        return DB_ERROR;
+    int discard = 0;
+    return run_query(db, query, &discard);
+}
 
-    int timeout_sec = 5;
+PGresult* db_exec_params(db_t* db, const char* query, int n_params, const char** params)
+{
+    int discard = 0;
+    return run_params(db, query, n_params, params, &discard);
+}
 
-    time_t start = time(NULL);
-
-    while (1)
+db_result_t execute_sql(db_t* db, const char* query, const char** params, int n_params)
+{
+    if (!db || !query)
     {
-        PGresult* result = db_exec_params(conn, query, n_params, params);
-        if (!result)
-            return DB_ERROR;
+        db_set_last(DB_ERROR, "database is not open");
+        return DB_ERROR;
+    }
 
-        ExecStatusType status = PQresultStatus(result);
+    int discard = 0;
+    PGresult* result = run_params(db, query, n_params, params, &discard);
+    if (!result)
+        return db_last_result() == DB_OK ? DB_ERROR : db_last_result();
 
-        if (status == PGRES_TUPLES_OK)
-        {
-            size_t n_rows = PQntuples(result);
-            size_t n_cols = PQnfields(result);
+    db_result_t code = map_status(result);
+    if (code != DB_OK)
+        logger_error("execute_sql: database error: %s", PQresultErrorMessage(result));
 
-            db_result_set_t* result_set = malloc(sizeof(db_result_set_t));
-            if (!result_set)
-            {
-                PQclear(result);
-                return DB_ERROR;
-            }
+    PQclear(result);
+    return code;
+}
 
-            result_set->n_rows = n_rows;
-            result_set->rows = malloc(sizeof(db_row_t) * n_rows);
-            if (!result_set->rows)
-            {
-                free(result_set);
-                PQclear(result);
-                return DB_ERROR;
-            }
+db_result_t execute_select(db_t* db, const char* query, const char** params, int n_params, db_result_set_t** out_result)
+{
+    if (!db || !query || !out_result)
+    {
+        db_set_last(DB_ERROR, "database is not open");
+        return DB_ERROR;
+    }
 
-            for (size_t i = 0; i < n_rows; i++)
-            {
-                result_set->rows[i].n_columns = n_cols;
-                result_set->rows[i].columns = malloc(sizeof(char*) * n_cols);
-                if (!result_set->rows[i].columns)
-                {
-                    for (size_t k = 0; k < i; k++)
-                    {
-                        for (size_t j = 0; j < result_set->rows[k].n_columns; j++)
-                            free(result_set->rows[k].columns[j]);
+    int discard = 0;
+    
+    PGresult* result = run_params(db, query, n_params, params, &discard);
+    if (!result)
+        return db_last_result() == DB_OK ? DB_ERROR : db_last_result();
 
-                        free(result_set->rows[k].columns);
-                    }
-
-                    free(result_set->rows);
-                    free(result_set);
-                    
-                    PQclear(result);
-
-                    return DB_ERROR;
-                }
-
-                for (size_t j = 0; j < n_cols; j++)
-                {
-                    const char* val = PQgetvalue(result, i, j);
-                    result_set->rows[i].columns[j] = strdup(val ? val : "");
-                }
-            }
-
-            PQclear(result);
-            *out_result = result_set;
-
-            return DB_OK;
-        }
-
-        if (status == PGRES_FATAL_ERROR)
-        {
-            PQclear(result);
-            return DB_ERROR;
-        }
+    if (PQresultStatus(result) != PGRES_TUPLES_OK)
+    {
+        db_result_t code = map_status(result);
+        if (code != DB_OK)
+            logger_error("execute_select: database error: %s", PQresultErrorMessage(result));
 
         PQclear(result);
 
-        if (difftime(time(NULL), start) > timeout_sec)
+        return code == DB_OK ? DB_ERROR : code;
+    }
+
+    size_t n_rows = PQntuples(result);
+    size_t n_cols = PQnfields(result);
+
+    db_result_set_t* result_set = malloc(sizeof(db_result_set_t));
+    if (!result_set)
+    {
+        PQclear(result);
+        db_set_last(DB_ERROR, "out of memory");
+        return DB_ERROR;
+    }
+
+    result_set->n_rows = n_rows;
+    result_set->rows = n_rows ? malloc(sizeof(db_row_t) * n_rows) : NULL;
+    if (n_rows && !result_set->rows)
+    {
+        free(result_set);
+        PQclear(result);
+        db_set_last(DB_ERROR, "out of memory");
+        return DB_ERROR;
+    }
+
+    for (size_t i = 0; i < n_rows; i++)
+    {
+        result_set->rows[i].n_columns = n_cols;
+        result_set->rows[i].columns = n_cols ? malloc(sizeof(char*) * n_cols) : NULL;
+        if (n_cols && !result_set->rows[i].columns)
         {
-            return DB_TIMEOUT;
+            for (size_t k = 0; k < i; k++)
+            {
+                for (size_t j = 0; j < result_set->rows[k].n_columns; j++)
+                    free(result_set->rows[k].columns[j]);
+                free(result_set->rows[k].columns);
+            }
+
+            free(result_set->rows);
+            free(result_set);
+            PQclear(result);
+
+            db_set_last(DB_ERROR, "out of memory");
+
+            return DB_ERROR;
+        }
+
+        for (size_t j = 0; j < n_cols; j++)
+        {
+            const char* val = PQgetvalue(result, i, j);
+            result_set->rows[i].columns[j] = strdup(val ? val : "");
         }
     }
+
+    PQclear(result);
+    db_set_last(DB_OK, "");
+    *out_result = result_set;
+
+    return DB_OK;
 }
 
 void free_result_set(db_result_set_t* rc)
@@ -160,9 +205,7 @@ void free_result_set(db_result_set_t* rc)
     for (size_t i = 0; i < rc->n_rows; i++)
     {
         for (size_t j = 0; j < rc->rows[i].n_columns; j++)
-        {
             free(rc->rows[i].columns[j]);
-        }
 
         free(rc->rows[i].columns);
     }

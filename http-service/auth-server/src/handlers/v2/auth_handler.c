@@ -6,12 +6,14 @@
 #include "profanity.h"
 #include "utilities.h"
 #include "redis/redis.h"
+#include "redis/redis_auth_token.h"
 #include "redis/redis_limits.h"
 #include "redis/redis_session.h"
 #include "redis/redis_verifycode.h"
-#include "redis/redis_email_confirm.h"
 #include "postgres/postgres_users.h"
+#include "postgres/validate.h"
 
+#include <stdio.h>
 #include <time.h>
 #include <stdbool.h>
 #include <inttypes.h>
@@ -29,6 +31,7 @@ typedef struct
 {
     char* email;
     char* password;
+    char* login_token;
 } auth_login_t;
 
 typedef struct
@@ -37,6 +40,7 @@ typedef struct
     char* username;
     char* email;
     char* password;
+    char* registration_token;
 } auth_create_t;
 
 typedef struct
@@ -44,6 +48,48 @@ typedef struct
     char* email;
     int code;
 } auth_verify_t;
+
+static int user_has_password(const user_core_t* user)
+{
+    return user && user->password && user->password[0] != '\0';
+}
+
+static void auth_reply_token_status(chttpx_request_t* req, chttpx_response_t* res, redis_auth_token_status_t status)
+{
+    const char* key = "error.something-went-wrong";
+    int http_status = cHTTPX_StatusInternalServerError;
+
+    if (status == REDIS_AUTH_TOKEN_MISSING)
+    {
+        key = "error.token-missing";
+        http_status = cHTTPX_StatusForbidden;
+    }
+    else if (status == REDIS_AUTH_TOKEN_EXPIRED)
+    {
+        key = "error.token-expired";
+        http_status = cHTTPX_StatusForbidden;
+    }
+    else if (status == REDIS_AUTH_TOKEN_MISMATCH)
+    {
+        key = "error.token-mismatch";
+        http_status = cHTTPX_StatusForbidden;
+    }
+
+    *res = cHTTPX_ResError(http_status, cHTTPX_i18n_t(key, req->language));
+}
+
+static int auth_reply_next(chttpx_request_t* req, chttpx_response_t* res, const char* next, const char* field, const char* value, int expires_in)
+{
+    chttpx_json_t* root = cHTTPX_JsonObject(req);
+    if (!root || cHTTPX_JsonString(root, "next", next) != 0 || cHTTPX_JsonString(root, field, value) != 0 || cHTTPX_JsonNumber(root, "expires_in", expires_in) != 0)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+        return 0;
+    }
+
+    *res = cHTTPX_ResJsonObject(cHTTPX_StatusOK, root);
+    return 1;
+}
 
 void auth_confirm_email_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
@@ -57,7 +103,7 @@ void auth_confirm_email_handler_v2(chttpx_request_t* req, chttpx_response_t* res
         return;
 
     /* Check limits verification code (24h.) */
-    if (redis_check_limit_email_and_increment(payload.email, MAX_EMAIL_LIMITS_24H) != 1)
+    if (redis_check_limit_email(payload.email, MAX_EMAIL_LIMITS_24H) != 1)
     {
         logger_error("auth_confirm_email_handler_v2 req={%s}: exceeded daily limit (:email)", req->request_id);
 
@@ -86,7 +132,7 @@ void auth_confirm_email_handler_v2(chttpx_request_t* req, chttpx_response_t* res
         return;
     }
 
-    logger_info("auth_confirm_email_handler_v2 req={%s}: email={%s} code={%" PRIu64 "}", req->request_id, payload.email, code);
+    logger_info("auth_confirm_email_handler_v2 req={%s}: email={%s}", req->request_id, payload.email);
 
     /* Send email */
     /* ---------- */
@@ -103,13 +149,19 @@ void auth_confirm_email_handler_v2(chttpx_request_t* req, chttpx_response_t* res
              cHTTPX_i18n_t("email.code-instruction", req->language), code, cHTTPX_i18n_t("email.code-expire", req->language),
              cHTTPX_i18n_t("email.footer", req->language));
 
-    if (send_email_async(payload.email, cHTTPX_i18n_t("email.subject", req->language), buffer, NULL) != 0)
+    if (send_email(payload.email, cHTTPX_i18n_t("email.subject", req->language), buffer, NULL) != 0)
     {
+        if (redis_verifycode_delete(payload.email) != 0)
+            logger_error("auth_confirm_email_handler_v2 req={%s}: failed to delete confirmation code after send failure", req->request_id);
+
         *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.sending-email", req->language));
         return;
     }
     /* ---------- */
     /* Send email */
+
+    if (redis_increment_limit_email(payload.email) != 1)
+        logger_error("auth_confirm_email_handler_v2 req={%s}: failed to count sent confirmation email", req->request_id);
 
     *res = cHTTPX_ResMessage(cHTTPX_StatusOK, cHTTPX_i18n_t("code-sent", req->language));
 }
@@ -140,8 +192,9 @@ void auth_login_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     auth_login_t payload = {0};
 
     chttpx_validation_t fields[] = {
-		cHTTPX_StringField("email", &payload.email, true, 5, 254, CHTTPX_TRIM | CHTTPX_LOWERCASE, validate_email),
+        cHTTPX_StringField("email", &payload.email, true, 5, 254, CHTTPX_TRIM | CHTTPX_LOWERCASE, validate_email),
         cHTTPX_StringField("password", &payload.password, false, 8, 16, CHTTPX_NORMALIZE_NONE, NULL),
+        cHTTPX_StringField("login_token", &payload.login_token, false, 0, 64, CHTTPX_NORMALIZE_NONE, NULL),
     };
 
     /* DB. get user core */
@@ -150,26 +203,38 @@ void auth_login_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))
         return;
 
-    user = db_user_core_get_by_email(app_context->conn, payload.email);
+    user = db_user_core_get_by_email(app_context->db, payload.email);
     if (!user)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusNotFound, cHTTPX_i18n_t("error.user-not-found", req->language));
         goto cleanup;
     }
 
-    /* If user exist password, but not in payload -> 202 */
-    if (user->password && user->password[0] != '\0' && !payload.password)
+    if (!user_has_password(user))
     {
-        *res = cHTTPX_ResMessage(cHTTPX_StatusAccepted, cHTTPX_i18n_t("error.password-required", req->language));
+        *res = cHTTPX_ResError(cHTTPX_StatusForbidden, cHTTPX_i18n_t("error.passwordless-login-denied", req->language));
         goto cleanup;
     }
 
-    if (user->password && user->password[0] != '\0' && !verify_password(payload.password, user->password))
+    redis_auth_token_status_t token_status = redis_auth_token_check(REDIS_AUTH_TOKEN_LOGIN, payload.login_token, payload.email);
+    if (token_status != REDIS_AUTH_TOKEN_OK)
+    {
+        auth_reply_token_status(req, res, token_status);
+        goto cleanup;
+    }
+
+    if (!payload.password || !verify_password(payload.password, user->password))
     {
         *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.incorrect-login-data", req->language));
         goto cleanup;
     }
 
+    token_status = redis_auth_token_consume(REDIS_AUTH_TOKEN_LOGIN, payload.login_token, payload.email);
+    if (token_status != REDIS_AUTH_TOKEN_OK)
+    {
+        auth_reply_token_status(req, res, token_status);
+        goto cleanup;
+    }
 
     session_t session = {.user_uid = user->user_uid, .expires_at = time(NULL) + REDIS_SESSION_TTL};
 
@@ -207,11 +272,15 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         cHTTPX_StringField("username", &payload.username, true, 4, 24, CHTTPX_TRIM, validate_username),
         cHTTPX_StringField("email", &payload.email, true, 5, 254, CHTTPX_TRIM | CHTTPX_LOWERCASE, validate_email),
         cHTTPX_StringField("password", &payload.password, false, 8, 16, CHTTPX_NORMALIZE_NONE, validate_password),
+        cHTTPX_StringField("registration_token", &payload.registration_token, false, 0, 64, CHTTPX_NORMALIZE_NONE, NULL),
     };
 
     /* DB. get user core */
     user_core_t* user = NULL;
     char* password_hash = NULL;
+
+    redis_auth_token_status_t token_status = REDIS_AUTH_TOKEN_ERROR;
+
     user_core_t* user_core = NULL;
     user_profile_t* user_profile = NULL;
     user_profile_access_t* user_profile_access = NULL;
@@ -220,12 +289,25 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))
         return;
 
+    if (!payload.registration_token || payload.registration_token[0] == '\0')
+    {
+        auth_reply_token_status(req, res, REDIS_AUTH_TOKEN_MISSING);
+        goto cleanup;
+    }
+
+    token_status = redis_auth_token_check(REDIS_AUTH_TOKEN_REGISTRATION, payload.registration_token, payload.email);
+    if (token_status != REDIS_AUTH_TOKEN_OK)
+    {
+        auth_reply_token_status(req, res, token_status);
+        goto cleanup;
+    }
+
     const char* profanity_texts[] = {payload.name, payload.username};
     if (!profanity_reject_from_env(req, res, "auth.create", profanity_texts, 2))
         return;
 
     /* Check user is exists */
-    user = db_user_core_get_by_email(app_context->conn, payload.email);
+    user = db_user_core_get_by_email(app_context->db, payload.email);
     if (user)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.user-already-registered", req->language));
@@ -321,7 +403,7 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     }
     user_active->user_uid = uid;
 
-    db_result_t user_db_result = db_user_create(app_context->conn, user_core, user_profile, user_profile_access, user_active);
+    db_result_t user_db_result = db_user_create(app_context->db, user_core, user_profile, user_profile_access, user_active);
 
     /* free memory */
     free(user_core->email);
@@ -340,23 +422,8 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     free(user_active);
     user_active = NULL;
 
-    switch (user_db_result)
-    {
-    case DB_OK:
-        break;
-
-    case DB_TIMEOUT:
-        *res = cHTTPX_ResError(cHTTPX_StatusConnectionTimedOut, cHTTPX_i18n_t("error.database-connection-timeout", req->language));
+    if (db_reply_result(req, res, user_db_result))
         goto cleanup;
-
-    case DB_DUPLICATE:
-        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.repeating-data-request", req->language));
-        goto cleanup;
-
-    case DB_ERROR:
-        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
-        goto cleanup;
-    }
 
     session_t session = {.user_uid = uid, .expires_at = time(NULL) + REDIS_SESSION_TTL};
 
@@ -368,6 +435,10 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     }
 
     *res = cHTTPX_ResMessage(cHTTPX_StatusCreated, session_id);
+
+    token_status = redis_auth_token_consume(REDIS_AUTH_TOKEN_REGISTRATION, payload.registration_token, payload.email);
+    if (token_status != REDIS_AUTH_TOKEN_OK)
+        logger_error("auth_create_handler_v2 req={%s}: registration token consume after create failed", req->request_id);
 
 cleanup:
     if (password_hash)
@@ -399,49 +470,99 @@ cleanup:
 
 void auth_verify_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
-    /* Initial session id */
     char* session_id = NULL;
+    char flow_token[64];
+
+    int code_held = 0;
+    int code_ttl = 0;
+    int completed = 0;
 
     auth_verify_t payload = {0};
 
     chttpx_validation_t fields[] = {
-		cHTTPX_StringField("email", &payload.email, true, 5, 254, CHTTPX_TRIM | CHTTPX_LOWERCASE, validate_email),
-        chttpx_validation_integer("code", &payload.code,true),
-	};
+        cHTTPX_StringField("email", &payload.email, true, 5, 254, CHTTPX_TRIM | CHTTPX_LOWERCASE, validate_email),
+        chttpx_validation_integer("code", &payload.code, true),
+    };
 
-    /* DB. get user core */
     user_core_t* user = NULL;
 
     if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))
         return;
 
-    int code;
-    if (!redis_verifycode_get(payload.email, &code) || payload.code != code)
+    int consumed = redis_verifycode_consume(payload.email, payload.code, &code_ttl);
+    if (consumed < 0)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+        goto cleanup;
+    }
+    
+    if (consumed == 0)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.invalid-confirmation-code", req->language));
         goto cleanup;
     }
 
-    user = db_user_core_get_by_email(app_context->conn, payload.email);
-    if (!user || (user->password && user->password[0] != '\0'))
+    code_held = 1;
+    if (code_ttl <= 0)
+        code_ttl = REDIS_VERIFYCODE_TTL;
+
+    db_result_t lookup = db_user_core_lookup_by_email(app_context->db, payload.email, &user);
+    if (db_reply_result(req, res, lookup))
+        goto cleanup;
+
+    if (user && !user->email_confirm)
     {
-        redis_mark_email_confirmed(payload.email);
-        *res = cHTTPX_ResMessage(cHTTPX_StatusAccepted, user ? cHTTPX_i18n_t("error.password-required", req->language) : cHTTPX_i18n_t("error.registration-required", req->language));
+        db_result_t confirm_result = db_user_core_upd_email_confirm(app_context->db, true, payload.email);
+        if (db_reply_result(req, res, confirm_result))
+            goto cleanup;
+    }
+
+    if (!user)
+    {
+        redis_auth_token_status_t token_status = redis_auth_token_create(REDIS_AUTH_TOKEN_REGISTRATION, payload.email, flow_token, sizeof(flow_token));
+        if (token_status != REDIS_AUTH_TOKEN_OK)
+        {
+            logger_error("auth_verify_handler_v2 req={%s}: failed to create registration token", req->request_id);
+            *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+            goto cleanup;
+        }
+
+        completed = auth_reply_next(req, res, "registration", "registration_token", flow_token, REDIS_AUTH_TOKEN_TTL);
         goto cleanup;
     }
 
-    session_t session = {.user_uid = user->user_uid, .expires_at = time(NULL) + REDIS_SESSION_TTL};
-
-    session_id = redis_session_create(&session);
-    if (!session_id)
+    if (!user_has_password(user))
     {
-        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.session-creation-error", req->language));
+        session_t session = {.user_uid = user->user_uid, .expires_at = time(NULL) + REDIS_SESSION_TTL};
+
+        session_id = redis_session_create(&session);
+        if (!session_id)
+        {
+            *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.session-creation-error", req->language));
+            goto cleanup;
+        }
+
+        completed = auth_reply_next(req, res, "authenticated", "session_id", session_id, REDIS_SESSION_TTL);
         goto cleanup;
     }
 
-    *res = cHTTPX_ResMessage(cHTTPX_StatusOK, session_id);
+    redis_auth_token_status_t token_status = redis_auth_token_create(REDIS_AUTH_TOKEN_LOGIN, payload.email, flow_token, sizeof(flow_token));
+    if (token_status != REDIS_AUTH_TOKEN_OK)
+    {
+        logger_error("auth_verify_handler_v2 req={%s}: failed to create login token", req->request_id);
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+        goto cleanup;
+    }
+
+    completed = auth_reply_next(req, res, "password", "login_token", flow_token, REDIS_AUTH_TOKEN_TTL);
 
 cleanup:
+    if (code_held && !completed)
+    {
+        if (redis_verifycode_restore(payload.email, payload.code, code_ttl) != 0)
+            logger_error("auth_verify_handler_v2 req={%s}: failed to restore confirmation code", req->request_id);
+    }
+
     if (user)
     {
         free(user->email);
@@ -462,25 +583,9 @@ void auth_delete_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         return;
     }
 
-    db_result_t user_del_db_result = db_user_del_by_uid(app_context->conn, ctx->user->user_uid);
-
-    switch (user_del_db_result)
-    {
-    case DB_OK:
-        break;
-
-    case DB_TIMEOUT:
-        *res = cHTTPX_ResError(cHTTPX_StatusConnectionTimedOut, cHTTPX_i18n_t("error.database-connection-timeout", req->language));
+    db_result_t user_del_db_result = db_user_del_by_uid(app_context->db, ctx->user->user_uid);
+    if (db_reply_result(req, res, user_del_db_result))
         return;
-
-    case DB_DUPLICATE:
-        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.repeating-data-request", req->language));
-        return;
-
-    case DB_ERROR:
-        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
-        return;
-    }
 
     /* DELETE AVATAR S3 */
     s3_config_t s3_config = {

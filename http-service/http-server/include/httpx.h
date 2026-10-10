@@ -2,9 +2,10 @@
 #define HTTPX_H
 
 #include <stdbool.h>
-#include <libpq-fe.h>
 #include <maxminddb.h>
 #include <libchttpx/libchttpx.h>
+
+typedef struct db db_t;
 
 #define HTTPX_SERVER_PORT 8080
 #define MODERATION_SERVER_PORT 8181
@@ -17,7 +18,7 @@ typedef struct {
 	chttpx_serv_t* http;
 	chttpx_serv_t* moderation;
 
-    PGconn* conn;
+    db_t* db;
     MMDB_s geoip;
 
     struct rabbitmq_runtime* rabbitmq;

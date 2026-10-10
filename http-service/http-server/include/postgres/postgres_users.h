@@ -105,37 +105,37 @@ typedef struct {
 
 /* SQLs */
 /* Create user_core */
-db_result_t db_user_core_create(PGconn* conn, user_core_t* user);
+db_result_t db_user_core_create(db_t* db, user_core_t* user);
 /* Create user_profile */
-db_result_t db_user_profile_create(PGconn* conn, user_profile_t* user);
+db_result_t db_user_profile_create(db_t* db, user_profile_t* user);
 /* Create user_profile_access */
-db_result_t db_user_profile_access_create(PGconn* conn, user_profile_access_t* user);
+db_result_t db_user_profile_access_create(db_t* db, user_profile_access_t* user);
 /* Create user_profile_active */
-db_result_t db_user_profile_active_create(PGconn* conn, user_active_t* user);
+db_result_t db_user_profile_active_create(db_t* db, user_active_t* user);
 /* Create FULL user */
-db_result_t db_user_create(PGconn* conn, user_core_t* user_core, user_profile_t* user_profile, 
+db_result_t db_user_create(db_t* db, user_core_t* user_core, user_profile_t* user_profile, 
                                 user_profile_access_t* user_profile_access, user_active_t* user_active);
 /* Get user info by user_uid */
-user_info_t* db_user_info_get_by_uid(PGconn* conn, uint64_t user_uid);
+user_info_t* db_user_info_get_by_uid(db_t* db, uint64_t user_uid);
 /* HELPER. Free user info */
 void db_user_info_free(user_info_t* user);
 /* Get user_core by email */
-user_core_t* db_user_core_get_by_email(PGconn* conn, char *email);
+user_core_t* db_user_core_get_by_email(db_t* db, char *email);
 /* Get user_core by user_uid */
-user_core_t* db_user_core_get_by_uid(PGconn* conn, uint64_t user_uid);
+user_core_t* db_user_core_get_by_uid(db_t* db, uint64_t user_uid);
 /* Update user email confirm by email */
-db_result_t db_user_core_upd_email_confirm(PGconn* conn, bool confirm, char* email);
+db_result_t db_user_core_upd_email_confirm(db_t* db, bool confirm, char* email);
 /* Update user profile avatar by user_uid*/
-db_result_t db_user_profile_upd_avatar_by_uid(PGconn* conn, uint64_t user_uid, char* avatar);
+db_result_t db_user_profile_upd_avatar_by_uid(db_t* db, uint64_t user_uid, char* avatar);
 /* Update user profile access by user_uid */
-db_result_t db_user_profile_access_upd_by_uid(PGconn* conn, uint64_t user_uid, user_profile_update_t* user);
+db_result_t db_user_profile_access_upd_by_uid(db_t* db, uint64_t user_uid, user_profile_update_t* user);
 /* Update user profile by user_uid */
-db_result_t db_user_profile_upd_by_uid(PGconn* conn, uint64_t user_uid, user_profile_update_t* user);
+db_result_t db_user_profile_upd_by_uid(db_t* db, uint64_t user_uid, user_profile_update_t* user);
 /* Update user core by user_uid */
-db_result_t db_user_core_upd_by_uid(PGconn* conn, uint64_t user_uid, user_profile_update_t* user);
+db_result_t db_user_core_upd_by_uid(db_t* db, uint64_t user_uid, user_profile_update_t* user);
 /* Update user UPDATE ALL by user_uid */
-db_result_t db_user_UPDATE_upd(PGconn* conn, uint64_t user_uid, user_profile_update_t* user);
+db_result_t db_user_UPDATE_upd(db_t* db, uint64_t user_uid, user_profile_update_t* user);
 /* Delete user by user_uid */
-db_result_t db_user_del_by_uid(PGconn* conn, uint64_t user_uid);
+db_result_t db_user_del_by_uid(db_t* db, uint64_t user_uid);
 
 #endif

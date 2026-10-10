@@ -18,17 +18,17 @@ typedef struct {
 } user_block_t;
 
 /* DB_OK + *out_block == NULL means the user is not blocked. */
-db_result_t db_user_block_get_active(PGconn* conn, uint64_t user_uid, user_block_t** out_block);
+db_result_t db_user_block_get_active(db_t* db, uint64_t user_uid, user_block_t** out_block);
 
 /* Create a block. blocked_until == 0 means a permanent block. */
-db_result_t db_user_block_create(PGconn* conn,
+db_result_t db_user_block_create(db_t* db,
                                  uint64_t user_uid,
                                  time_t blocked_until,
                                  const char* reason,
                                  uint64_t blocked_by_uid);
 
 /* Revoke all currently active blocks for the user. */
-db_result_t db_user_block_revoke_active(PGconn* conn,
+db_result_t db_user_block_revoke_active(db_t* db,
                                         uint64_t user_uid,
                                         uint64_t revoked_by_uid,
                                         const char* revoke_reason);

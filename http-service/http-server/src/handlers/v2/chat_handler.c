@@ -1,5 +1,6 @@
 #include "handlers.h"
 #include "postgres/postgres_chats.h"
+#include "postgres/validate.h"
 
 #include "s3.h"
 #include "httpx.h"
@@ -112,7 +113,7 @@ void chat_get_my_history_handler_v2(chttpx_request_t* req, chttpx_response_t* re
     }
     size_t offset = (size_t)offset_value;
 
-    chat_preview_LIST_t* chats_preview = db_chat_get_my_history(app_context->conn, ctx->user->user_uid, offset);
+    chat_preview_LIST_t* chats_preview = db_chat_get_my_history(app_context->db, ctx->user->user_uid, offset);
     *res = chat_preview_response(req, chats_preview);
     chat_preview_list_free(chats_preview);
 }
@@ -128,7 +129,7 @@ void chat_get_by_username_handler_v2(chttpx_request_t* req, chttpx_response_t* r
 
     const char* username_param = cHTTPX_Param(req, "username");
 
-    chat_preview_LIST_t* chats_preview = db_chat_get_by_username(app_context->conn, ctx->user->user_uid, username_param);
+    chat_preview_LIST_t* chats_preview = db_chat_get_by_username(app_context->db, ctx->user->user_uid, username_param);
     *res = chat_preview_response(req, chats_preview);
     chat_preview_list_free(chats_preview);
 }
@@ -152,14 +153,14 @@ void chat_get_settings_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         return;
     }
 
-    bool is_member = db_chat_get_member_exists_by_chat_id(app_context->conn, chat_id, ctx->user->user_uid);
+    bool is_member = db_chat_get_member_exists_by_chat_id(app_context->db, chat_id, ctx->user->user_uid);
     if (!is_member)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusForbidden, cHTTPX_i18n_t("error.not-member-chat", req->language));
         goto cleanup;
     }
 
-    chat_setting = db_chat_get_setting_by_chat_id(app_context->conn, chat_id);
+    chat_setting = db_chat_get_setting_by_chat_id(app_context->db, chat_id);
     if (!chat_setting)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusNotFound, cHTTPX_i18n_t("error.chat-setting-not-found", req->language));
@@ -202,7 +203,7 @@ void chat_upload_custom_bg_handler_v2(chttpx_request_t* req, chttpx_response_t* 
         return;
     }
 
-    bool is_member = db_chat_get_member_exists_by_chat_id(app_context->conn, chat_id, ctx->user->user_uid);
+    bool is_member = db_chat_get_member_exists_by_chat_id(app_context->db, chat_id, ctx->user->user_uid);
     if (!is_member)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusForbidden, cHTTPX_i18n_t("error.not-member-chat", req->language));
@@ -225,7 +226,7 @@ void chat_upload_custom_bg_handler_v2(chttpx_request_t* req, chttpx_response_t* 
         goto cleanup;
     }
 
-    chat_setting = db_chat_get_setting_by_chat_id(app_context->conn, chat_id);
+    chat_setting = db_chat_get_setting_by_chat_id(app_context->db, chat_id);
     if (!chat_setting)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusNotFound, cHTTPX_i18n_t("error.chat-setting-not-found", req->language));
@@ -270,25 +271,9 @@ void chat_upload_custom_bg_handler_v2(chttpx_request_t* req, chttpx_response_t* 
     }
 
     /* update cbackground in database */
-    db_result_t chat_db_result = db_chat_upd_cbackground_by_chat_id(app_context->conn, url, chat_id);
-
-    switch (chat_db_result)
-    {
-    case DB_OK:
-        break;
-
-    case DB_TIMEOUT:
-        *res = cHTTPX_ResError(cHTTPX_StatusConnectionTimedOut, cHTTPX_i18n_t("error.database-connection-timeout", req->language));
+    db_result_t chat_db_result = db_chat_upd_cbackground_by_chat_id(app_context->db, url, chat_id);
+    if (db_reply_result(req, res, chat_db_result))
         goto cleanup;
-
-    case DB_DUPLICATE:
-        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.repeating-data-request", req->language));
-        goto cleanup;
-
-    case DB_ERROR:
-        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
-        goto cleanup;
-    }
 
     *res = cHTTPX_ResMessage(cHTTPX_StatusOK, url);
 

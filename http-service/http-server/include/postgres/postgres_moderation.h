@@ -27,7 +27,7 @@ typedef struct {
 
 /* DB_OK + *out_target == NULL means that the target does not exist anymore
  * or is not a moderatable media target. */
-db_result_t db_moderation_target_get(PGconn* conn,
+db_result_t db_moderation_target_get(db_t* db,
                                      const char* target_type,
                                      uint64_t target_id,
                                      moderation_target_t** out_target);
@@ -35,7 +35,7 @@ db_result_t db_moderation_target_get(PGconn* conn,
 /* Atomically removes the still-current target, records one unique violation,
  * and creates the escalated account block. Duplicate/redelivered work returns
  * DB_OK with out_result->applied == false. */
-db_result_t db_moderation_apply_violation(PGconn* conn,
+db_result_t db_moderation_apply_violation(db_t* db,
                                           const moderation_target_t* target,
                                           uint64_t reporter_uid,
                                           moderation_apply_result_t* out_result);

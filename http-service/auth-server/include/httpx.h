@@ -2,9 +2,10 @@
 #define HTTPX_H
 
 #include <stdbool.h>
-#include <libpq-fe.h>
 #include <maxminddb.h>
 #include <libchttpx/libchttpx.h>
+
+typedef struct db db_t;
 
 #define HTTPX_SERVER_PORT 8081
 
@@ -14,7 +15,7 @@ typedef struct {
 
 	chttpx_serv_t* http;
 
-    PGconn* conn;
+    db_t* db;
     MMDB_s geoip;
 } app_context_t;
 

@@ -4,7 +4,7 @@
 #include "logger.h"
 
 /* Create chat group and return chat id */
-db_result_t db_group_chat_create(PGconn* conn, chat_group_t* chat_group, uint64_t* out_chat_group_id)
+db_result_t db_group_chat_create(db_t* db, chat_group_t* chat_group, uint64_t* out_chat_group_id)
 {
     const char* query = "INSERT INTO chat_groups (user_uid, name) VALUES ($1, $2) RETURNING id";
 
@@ -19,9 +19,9 @@ db_result_t db_group_chat_create(PGconn* conn, chat_group_t* chat_group, uint64_
 
     while (1)
     {
-        PGresult* res = db_exec_params(conn, query, 2, params);
+        PGresult* res = db_exec_params(db, query, 2, params);
         if (!res)
-            return DB_ERROR;
+            return db_last_result();
 
         ExecStatusType status = PQresultStatus(res);
 
@@ -43,8 +43,9 @@ db_result_t db_group_chat_create(PGconn* conn, chat_group_t* chat_group, uint64_
         if (status == PGRES_FATAL_ERROR)
         {
             logger_error("db_group_chat_create: failed to exec sql: %s", PQresultErrorMessage(res));
+            db_result_t fatal = db_fatal_result(res);
             PQclear(res);
-            return DB_ERROR;
+            return fatal;
         }
 
         PQclear(res);
@@ -54,7 +55,7 @@ db_result_t db_group_chat_create(PGconn* conn, chat_group_t* chat_group, uint64_
     }
 }
 
-db_result_t db_group_chat_add_chats(PGconn* conn, uint64_t user_uid, uint64_t group_id, int* chat_ids, size_t chat_size)
+db_result_t db_group_chat_add_chats(db_t* db, uint64_t user_uid, uint64_t group_id, int* chat_ids, size_t chat_size)
 {
     const char* query = "INSERT INTO chat_group_user_chats (user_uid, group_id, chat_id) "
                         "SELECT $1, $2, UNNEST($3::bigint[]) "
@@ -87,17 +88,17 @@ db_result_t db_group_chat_add_chats(PGconn* conn, uint64_t user_uid, uint64_t gr
 
     const char* params[3] = {user_uid_str, group_id_str, chats_array};
 
-    db_result_t result = execute_sql(conn, query, params, 3);
+    db_result_t result = execute_sql(db, query, params, 3);
     if (result != DB_OK)
     {
-        logger_error("db_group_chat_add_chats user_uid={%lu}: failed to exec sql: %s", user_uid, PQerrorMessage(conn));
+        logger_error("db_group_chat_add_chats user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
     }
 
     return result;
 }
 
 /* Edit name chat group */
-db_result_t db_group_chat_edit_name_by_group_id(PGconn* conn, uint64_t group_id, uint64_t user_uid, char* name)
+db_result_t db_group_chat_edit_name_by_group_id(db_t* db, uint64_t group_id, uint64_t user_uid, char* name)
 {
     const char* query = "UPDATE chat_groups SET name = $1\n"
                         "WHERE id = $2\n"
@@ -112,17 +113,17 @@ db_result_t db_group_chat_edit_name_by_group_id(PGconn* conn, uint64_t group_id,
 
     const char* params[3] = {name, group_id_str, user_uid_str};
 
-    db_result_t result = execute_sql(conn, query, params, 3);
+    db_result_t result = execute_sql(db, query, params, 3);
     if (result != DB_OK)
     {
-        logger_error("db_group_chat_edit_name_by_group_id user_uid={%lu}: failed to exec sql: %s", user_uid, PQerrorMessage(conn));
+        logger_error("db_group_chat_edit_name_by_group_id user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
     }
 
     return result;
 }
 
 /* Update chats in group */
-db_result_t db_group_chat_edit_chats_by_group_id(PGconn* conn, uint64_t group_id, uint64_t user_uid, int* chat_ids, size_t chat_size)
+db_result_t db_group_chat_edit_chats_by_group_id(db_t* db, uint64_t group_id, uint64_t user_uid, int* chat_ids, size_t chat_size)
 {
     const char* query = "WITH new_chats AS (\n"
                         "    SELECT UNNEST($3::bigint[]) AS chat_id\n"
@@ -164,16 +165,16 @@ db_result_t db_group_chat_edit_chats_by_group_id(PGconn* conn, uint64_t group_id
 
     const char* params[3] = {user_uid_str, group_id_str, chats_array};
 
-    db_result_t result = execute_sql(conn, query, params, 3);
+    db_result_t result = execute_sql(db, query, params, 3);
     if (result != DB_OK)
     {
-        logger_error("db_group_chat_edit_chats_by_group_id user_uid={%lu}: failed to exec sql: %s", user_uid, PQerrorMessage(conn));
+        logger_error("db_group_chat_edit_chats_by_group_id user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
     }
 
     return result;
 }
 
-db_result_t db_group_chat_delete(PGconn* conn, uint64_t user_uid, uint64_t group_id)
+db_result_t db_group_chat_delete(db_t* db, uint64_t user_uid, uint64_t group_id)
 {
     const char* query = "WITH deleted_links AS (\n"
                         "   DELETE FROM chat_group_user_chats\n"
@@ -190,16 +191,16 @@ db_result_t db_group_chat_delete(PGconn* conn, uint64_t user_uid, uint64_t group
 
     const char* params[2] = {group_id_str, user_uid_str};
 
-    db_result_t result = execute_sql(conn, query, params, 2);
+    db_result_t result = execute_sql(db, query, params, 2);
     if (result != DB_OK)
     {
-        logger_error("db_group_delete user_uid={%lu}: failed to exec sql: %s", user_uid, PQerrorMessage(conn));
+        logger_error("db_group_delete user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
     }
 
     return result;
 }
 
-// chat_group_LIST_t* db_group_chat_get_list(PGconn* conn, uint64_t user_uid)
+// chat_group_LIST_t* db_group_chat_get_list(db_t* db, uint64_t user_uid)
 // {
 //     const char* query = "SELECT\n"
 //                         "   chat_groups.id,\n"
@@ -219,10 +220,10 @@ db_result_t db_group_chat_delete(PGconn* conn, uint64_t user_uid, uint64_t group
 
 //     db_result_set_t* rc = NULL;
 
-//     db_result_t result = execute_select(conn, query, params, 1, &rc);
+//     db_result_t result = execute_select(db, query, params, 1, &rc);
 //     if (result != DB_OK)
 //     {
-//         logger_error("db_group_chat_get_list user_uid={%lu}: failed to exec sql: %s", user_uid, PQerrorMessage(conn));
+//         logger_error("db_group_chat_get_list user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
 //         free_result_set(rc);
 //         return NULL;
 //     }

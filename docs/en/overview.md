@@ -98,7 +98,7 @@ Auth-server also calls **profanity** (registration / profile-like text fields) a
 
 ## Shared dependencies
 
-- **PostgreSQL** — users, chats, messages, moderation tables. Migrations are owned by **http-server only**. Auth-server connects to the same DB but does **not** run migrations.
+- **PostgreSQL** — users, chats, messages, moderation tables. Each process keeps its own connection pool (`DB_MAX_OPEN`, default 16). Migrations are owned by **http-server only**. Auth-server connects to the same DB but does **not** run migrations.
 - **Redis** — sessions, email verify codes, rate limits, email-confirm flags.
 - **S3** — avatars / private media.
 - **SMTP** — confirmation emails (auth-server).

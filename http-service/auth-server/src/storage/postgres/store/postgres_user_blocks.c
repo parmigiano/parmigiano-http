@@ -6,9 +6,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-db_result_t db_user_block_get_active(PGconn* conn, uint64_t user_uid, user_block_t** out_block)
+db_result_t db_user_block_get_active(db_t* db, uint64_t user_uid, user_block_t** out_block)
 {
-    if (!conn || !out_block || !user_uid)
+    if (!db || !out_block || !user_uid)
         return DB_ERROR;
 
     *out_block = NULL;
@@ -27,10 +27,10 @@ db_result_t db_user_block_get_active(PGconn* conn, uint64_t user_uid, user_block
     snprintf(user_uid_str, sizeof(user_uid_str), "%lu", user_uid);
 
     const char* params[1] = {user_uid_str};
-    db_result_t result = execute_select(conn, query, params, 1, &rc);
+    db_result_t result = execute_select(db, query, params, 1, &rc);
     if (result != DB_OK)
     {
-        logger_error("db_user_block_get_active user_uid={%lu}: failed to exec sql: %s", user_uid, PQerrorMessage(conn));
+        logger_error("db_user_block_get_active user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
         free_result_set(rc);
         return result;
     }
@@ -61,13 +61,13 @@ db_result_t db_user_block_get_active(PGconn* conn, uint64_t user_uid, user_block
     return DB_OK;
 }
 
-db_result_t db_user_block_create(PGconn* conn,
+db_result_t db_user_block_create(db_t* db,
                                  uint64_t user_uid,
                                  time_t blocked_until,
                                  const char* reason,
                                  uint64_t blocked_by_uid)
 {
-    if (!conn || !user_uid || !reason || !*reason)
+    if (!db || !user_uid || !reason || !*reason)
         return DB_ERROR;
 
     const char* query =
@@ -85,15 +85,15 @@ db_result_t db_user_block_create(PGconn* conn,
     snprintf(blocked_by_uid_str, sizeof(blocked_by_uid_str), "%lu", blocked_by_uid);
 
     const char* params[4] = {user_uid_str, blocked_until_str, reason, blocked_by_uid_str};
-    return execute_sql(conn, query, params, 4);
+    return execute_sql(db, query, params, 4);
 }
 
-db_result_t db_user_block_revoke_active(PGconn* conn,
+db_result_t db_user_block_revoke_active(db_t* db,
                                         uint64_t user_uid,
                                         uint64_t revoked_by_uid,
                                         const char* revoke_reason)
 {
-    if (!conn || !user_uid)
+    if (!db || !user_uid)
         return DB_ERROR;
 
     const char* query =
@@ -112,7 +112,7 @@ db_result_t db_user_block_revoke_active(PGconn* conn,
     snprintf(revoked_by_uid_str, sizeof(revoked_by_uid_str), "%lu", revoked_by_uid);
 
     const char* params[3] = {user_uid_str, revoked_by_uid_str, revoke_reason ? revoke_reason : ""};
-    return execute_sql(conn, query, params, 3);
+    return execute_sql(db, query, params, 3);
 }
 
 void db_user_block_free(user_block_t* block)

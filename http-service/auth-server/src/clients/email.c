@@ -139,46 +139,45 @@ int send_email(const char* to, const char* subject, const char* body, const char
     struct upload_status upload_ctx = {payload, 0, strlen(payload)};
 
     curl = curl_easy_init();
-    if (curl)
+    if (!curl)
     {
-        char url[245];
-        /* Port 465 uses implicit TLS; 587 uses SMTP upgraded via STARTTLS. */
-        const char* scheme = strcmp(smtp_port, "465") == 0 ? "smtps" : "smtp";
-        snprintf(url, sizeof(url), "%s://%s:%s", scheme, smtp_server, smtp_port);
-
-        struct curl_slist* recipients = NULL;
-        recipients = curl_slist_append(recipients, to);
-        if (cc)
-            recipients = curl_slist_append(recipients, cc);
-
-        curl_easy_setopt(curl, CURLOPT_URL, url);
-        curl_easy_setopt(curl, CURLOPT_USERNAME, smtp_email);
-        curl_easy_setopt(curl, CURLOPT_PASSWORD, smtp_pass);
-        curl_easy_setopt(curl, CURLOPT_MAIL_FROM, smtp_email);
-        curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, recipients);
-
-        curl_easy_setopt(curl, CURLOPT_READFUNCTION, payload_source);
-        curl_easy_setopt(curl, CURLOPT_READDATA, &upload_ctx);
-        curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
-
-        curl_easy_setopt(curl, CURLOPT_USE_SSL, (long)CURLUSESSL_ALL);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
-        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
-        curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
-
-        res = curl_easy_perform(curl);
-        if (res != CURLE_OK)
-        {
-            logger_error("send_email to={%s}: email send error: %s", to, curl_easy_strerror(res));
-        }
-        else
-        {
-            logger_info("email sent: %s", to);
-        }
-
-        curl_slist_free_all(recipients);
-        curl_easy_cleanup(curl);
+        logger_error("send_email to={%s}: failed to initialize curl", to);
+        return 1;
     }
 
-    return (int)res;
+    char url[245];
+    /* Port 465 uses implicit TLS; 587 uses SMTP upgraded via STARTTLS. */
+    const char* scheme = strcmp(smtp_port, "465") == 0 ? "smtps" : "smtp";
+    snprintf(url, sizeof(url), "%s://%s:%s", scheme, smtp_server, smtp_port);
+
+    struct curl_slist* recipients = NULL;
+    recipients = curl_slist_append(recipients, to);
+    if (cc)
+        recipients = curl_slist_append(recipients, cc);
+
+    curl_easy_setopt(curl, CURLOPT_URL, url);
+    curl_easy_setopt(curl, CURLOPT_USERNAME, smtp_email);
+    curl_easy_setopt(curl, CURLOPT_PASSWORD, smtp_pass);
+    curl_easy_setopt(curl, CURLOPT_MAIL_FROM, smtp_email);
+    curl_easy_setopt(curl, CURLOPT_MAIL_RCPT, recipients);
+
+    curl_easy_setopt(curl, CURLOPT_READFUNCTION, payload_source);
+    curl_easy_setopt(curl, CURLOPT_READDATA, &upload_ctx);
+    curl_easy_setopt(curl, CURLOPT_UPLOAD, 1L);
+
+    curl_easy_setopt(curl, CURLOPT_USE_SSL, (long)CURLUSESSL_ALL);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 1L);
+    curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 2L);
+    curl_easy_setopt(curl, CURLOPT_VERBOSE, 1L);
+
+    res = curl_easy_perform(curl);
+    if (res != CURLE_OK)
+        logger_error("send_email to={%s}: email send error: %s", to, curl_easy_strerror(res));
+    else
+        logger_info("email sent: %s", to);
+
+    curl_slist_free_all(recipients);
+    curl_easy_cleanup(curl);
+
+    return res == CURLE_OK ? 0 : 1;
 }

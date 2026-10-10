@@ -54,10 +54,10 @@ typedef struct {
 
 /* SQLs */
 /* Create message */
-db_result_t db_message_create(PGconn* conn, message_t* msg, uint64_t* out_message_id);
+db_result_t db_message_create(db_t* db, message_t* msg, uint64_t* out_message_id);
 /* Create message status */
-db_result_t db_message_create_status(PGconn* conn, uint64_t message_id, uint64_t chat_id, uint64_t sender_uid);
+db_result_t db_message_create_status(db_t* db, uint64_t message_id, uint64_t chat_id, uint64_t sender_uid);
 /* Create message with transaction */
-db_result_t db_message_create_all(PGconn* conn, message_t* msg);
+db_result_t db_message_create_all(db_t* db, message_t* msg);
 
 #endif

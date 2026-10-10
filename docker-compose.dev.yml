@@ -94,35 +94,6 @@ services:
             retries: 12
             start_period: 15s
 
-    rabbitmq:
-        image: rabbitmq:3-management
-        restart: unless-stopped
-        environment:
-            RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-parmigiano}
-            RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-local-development-only}
-        volumes:
-            - rabbitmq_data:/var/lib/rabbitmq
-        ports:
-            - '127.0.0.1:5672:5672'
-            - '127.0.0.1:15672:15672'
-        networks:
-            parmigiano:
-                aliases:
-                    - rabbitmq
-        healthcheck:
-            test: ['CMD-SHELL', 'rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_port_connectivity']
-            interval: 10s
-            timeout: 5s
-            retries: 5
-            start_period: 10s
-        security_opt:
-            - no-new-privileges:true
-        logging:
-            driver: json-file
-            options:
-                max-size: '10m'
-                max-file: '3'
-
     http_server:
         restart: always
         build:
@@ -131,8 +102,8 @@ services:
         env_file: 'http-service/http-server/.env'
         volumes:
             - ./http-service/http-server/logs:/app/logs
-        ports:
-            - '8080:8080'
+        expose:
+            - '8080'
         depends_on:
             nsfw:
                 condition: service_healthy
@@ -140,8 +111,6 @@ services:
                 condition: service_healthy
             libretranslate:
                 condition: service_started
-            rabbitmq:
-                condition: service_healthy
         networks:
             parmigiano:
                 aliases:
@@ -162,8 +131,8 @@ services:
         env_file: 'http-service/auth-server/.env'
         volumes:
             - ./http-service/auth-server/logs:/app/logs
-        ports:
-            - '8081:8081'
+        expose:
+            - '8081'
         depends_on:
             profanity:
                 condition: service_healthy
@@ -184,7 +153,6 @@ services:
 volumes:
     # ollama_phi_data:
     lt_data:
-    rabbitmq_data:
 
 networks:
     parmigiano:

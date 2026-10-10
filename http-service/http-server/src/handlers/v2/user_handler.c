@@ -6,6 +6,7 @@
 #include "nsfw.h"
 #include "profanity.h"
 #include "utilities.h"
+#include "postgres/validate.h"
 
 #include <inttypes.h>
 
@@ -157,26 +158,11 @@ void user_upload_avatar_handler_v2(chttpx_request_t* req, chttpx_response_t* res
     remove_uploaded_file = true;
 
     /* update in database */
-    db_result_t user_upd_result = db_user_profile_upd_avatar_by_uid(app_context->conn, ctx->user->user_uid, url);
-
-    switch (user_upd_result)
-    {
-    case DB_OK:
-        remove_uploaded_file = false;
-        break;
-
-    case DB_TIMEOUT:
-        *res = cHTTPX_ResError(cHTTPX_StatusConnectionTimedOut, cHTTPX_i18n_t("error.database-connection-timeout", req->language));
+    db_result_t user_upd_result = db_user_profile_upd_avatar_by_uid(app_context->db, ctx->user->user_uid, url);
+    if (db_reply_result(req, res, user_upd_result))
         goto cleanup;
 
-    case DB_DUPLICATE:
-        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.repeating-data-request", req->language));
-        goto cleanup;
-
-    case DB_ERROR:
-        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
-        goto cleanup;
-    }
+    remove_uploaded_file = false;
 
     /* The profile already points to the new avatar, so failure to delete the old object is non-fatal. */
     if (ctx->user->avatar && *ctx->user->avatar && strcmp(ctx->user->avatar, url) != 0)
@@ -216,7 +202,7 @@ void user_get_profile_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         goto cleanup;
     }
 
-    user = db_user_info_get_by_uid(app_context->conn, user_uid);
+    user = db_user_info_get_by_uid(app_context->db, user_uid);
     if (!user)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusNotFound, cHTTPX_i18n_t("error.user-not-found", req->language));
@@ -308,25 +294,9 @@ void user_update_profile_handler_v2(chttpx_request_t* req, chttpx_response_t* re
         payload.password = password_hash;
     }
 
-    db_result_t user_db_result = db_user_UPDATE_upd(app_context->conn, ctx->user->user_uid, &payload);
-
-    switch (user_db_result)
-    {
-    case DB_OK:
-        break;
-
-    case DB_TIMEOUT:
-        *res = cHTTPX_ResError(cHTTPX_StatusConnectionTimedOut, cHTTPX_i18n_t("error.database-connection-timeout", req->language));
+    db_result_t user_db_result = db_user_UPDATE_upd(app_context->db, ctx->user->user_uid, &payload);
+    if (db_reply_result(req, res, user_db_result))
         goto cleanup;
-
-    case DB_DUPLICATE:
-        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.repeating-data-request", req->language));
-        goto cleanup;
-
-    case DB_ERROR:
-        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
-        goto cleanup;
-    }
 
     *res = cHTTPX_ResMessage(cHTTPX_StatusOK, cHTTPX_i18n_t("profile-updated", req->language));
 

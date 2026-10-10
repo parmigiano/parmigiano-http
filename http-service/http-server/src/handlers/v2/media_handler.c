@@ -7,6 +7,7 @@
 
 #include "postgres/postgres_chats.h"
 #include "postgres/postgres_messages.h"
+#include "postgres/validate.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,7 +41,7 @@ void media_upload_in_chat_handler_v2(chttpx_request_t* req, chttpx_response_t* r
         return;
     }
 
-    bool is_member = db_chat_get_member_exists_by_chat_id(app_context->conn, chat_id, ctx->user->user_uid);
+    bool is_member = db_chat_get_member_exists_by_chat_id(app_context->db, chat_id, ctx->user->user_uid);
     if (!is_member)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusForbidden, cHTTPX_i18n_t("error.not-member-chat", req->language));
@@ -105,26 +106,11 @@ void media_upload_in_chat_handler_v2(chttpx_request_t* req, chttpx_response_t* r
         goto cleanup;
     }
 
-    db_result_t message_db_result = db_message_create_all(app_context->conn, message);
-
-    switch (message_db_result)
-    {
-    case DB_OK:
-        remove_uploaded_file = false;
-        break;
-
-    case DB_TIMEOUT:
-        *res = cHTTPX_ResError(cHTTPX_StatusConnectionTimedOut, cHTTPX_i18n_t("error.database-connection-timeout", req->language));
+    db_result_t message_db_result = db_message_create_all(app_context->db, message);
+    if (db_reply_result(req, res, message_db_result))
         goto cleanup;
 
-    case DB_DUPLICATE:
-        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.repeating-data-request", req->language));
-        goto cleanup;
-
-    case DB_ERROR:
-        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
-        goto cleanup;
-    }
+    remove_uploaded_file = false;
 
     *res = cHTTPX_ResNoContent();
 

@@ -116,14 +116,14 @@ static int command_ok(PGresult* res)
     return res && PQresultStatus(res) == PGRES_COMMAND_OK;
 }
 
-static void migration_fatal(PGconn* conn, const char* message)
+static void migration_fatal(db_t* db, const char* message)
 {
-    logger_error("run_migrations: %s: %s", message, conn ? PQerrorMessage(conn) : "database unavailable");
+    logger_error("run_migrations: %s: %s", message, db ? db_error_message(db) : "database unavailable");
     fprintf(stderr, "migration error: %s\n", message);
 
-    if (conn)
+    if (db)
     {
-        PGresult* unlock = db_exec(conn, "SELECT pg_advisory_unlock(" "73490127" ")");
+        PGresult* unlock = db_exec(db, "SELECT pg_advisory_unlock(" "73490127" ")");
         if (unlock)
             PQclear(unlock);
     }
@@ -131,21 +131,39 @@ static void migration_fatal(PGconn* conn, const char* message)
     exit(EXIT_FAILURE);
 }
 
-void run_migrations(PGconn* conn)
-{
-    if (!conn || PQstatus(conn) != CONNECTION_OK)
-        migration_fatal(conn, "database connection is not ready");
+static void run_migrations_body(db_t* db);
 
-    PGresult* res = db_exec(conn, "SELECT pg_advisory_lock(" "73490127" ")");
+static db_result_t run_migrations_hold(db_t* db, void* arg)
+{
+    (void)arg;
+    run_migrations_body(db);
+    return DB_OK;
+}
+
+void run_migrations(db_t* db)
+{
+    if (!db)
+        migration_fatal(NULL, "database connection is not ready");
+
+    if (db_hold(db, run_migrations_hold, NULL) != DB_OK)
+        migration_fatal(NULL, "failed to acquire migration connection");
+}
+
+static void run_migrations_body(db_t* db)
+{
+    if (!db)
+        migration_fatal(db, "database connection is not ready");
+
+    PGresult* res = db_exec(db, "SELECT pg_advisory_lock(" "73490127" ")");
     if (!res || PQresultStatus(res) != PGRES_TUPLES_OK)
     {
         if (res)
             PQclear(res);
-        migration_fatal(conn, "failed to acquire migration lock");
+        migration_fatal(db, "failed to acquire migration lock");
     }
     PQclear(res);
 
-    res = db_exec(conn,
+    res = db_exec(db,
         "CREATE TABLE IF NOT EXISTS schema_migrations ("
         "version INT PRIMARY KEY, "
         "name TEXT, "
@@ -156,25 +174,25 @@ void run_migrations(PGconn* conn)
     {
         if (res)
             PQclear(res);
-        migration_fatal(conn, "failed to initialize schema_migrations");
+        migration_fatal(db, "failed to initialize schema_migrations");
     }
     PQclear(res);
 
-    res = db_exec(conn, "ALTER TABLE schema_migrations ADD COLUMN IF NOT EXISTS name TEXT");
+    res = db_exec(db, "ALTER TABLE schema_migrations ADD COLUMN IF NOT EXISTS name TEXT");
     if (!command_ok(res))
     {
         if (res)
             PQclear(res);
-        migration_fatal(conn, "failed to add migration name column");
+        migration_fatal(db, "failed to add migration name column");
     }
     PQclear(res);
 
-    res = db_exec(conn, "ALTER TABLE schema_migrations ADD COLUMN IF NOT EXISTS checksum VARCHAR(16)");
+    res = db_exec(db, "ALTER TABLE schema_migrations ADD COLUMN IF NOT EXISTS checksum VARCHAR(16)");
     if (!command_ok(res))
     {
         if (res)
             PQclear(res);
-        migration_fatal(conn, "failed to add migration checksum column");
+        migration_fatal(db, "failed to add migration checksum column");
     }
     PQclear(res);
 
@@ -183,7 +201,7 @@ void run_migrations(PGconn* conn)
     {
         char detail[256];
         snprintf(detail, sizeof(detail), "failed to open migrations directory %s: %s", FOLDER_SQL_MIGRATIONS, strerror(errno));
-        migration_fatal(conn, detail);
+        migration_fatal(db, detail);
     }
 
     size_t capacity = 32;
@@ -192,7 +210,7 @@ void run_migrations(PGconn* conn)
     if (!files)
     {
         closedir(dir);
-        migration_fatal(conn, "out of memory while listing migrations");
+        migration_fatal(db, "out of memory while listing migrations");
     }
 
     struct dirent* ent;
@@ -209,7 +227,7 @@ void run_migrations(PGconn* conn)
             if (!grown)
             {
                 closedir(dir);
-                migration_fatal(conn, "out of memory while growing migration list");
+                migration_fatal(db, "out of memory while growing migration list");
             }
             files = grown;
         }
@@ -218,7 +236,7 @@ void run_migrations(PGconn* conn)
         if (!files[count])
         {
             closedir(dir);
-            migration_fatal(conn, "out of memory while copying migration filename");
+            migration_fatal(db, "out of memory while copying migration filename");
         }
         count++;
     }
@@ -233,7 +251,7 @@ void run_migrations(PGconn* conn)
         parse_migration_version(files[i - 1], &prev);
         parse_migration_version(files[i], &current);
         if (prev == current)
-            migration_fatal(conn, "duplicate migration version detected");
+            migration_fatal(db, "duplicate migration version detected");
     }
 
     for (size_t i = 0; i < count; ++i)
@@ -244,11 +262,11 @@ void run_migrations(PGconn* conn)
         char path[1024];
         int path_len = snprintf(path, sizeof(path), "%s/%s", FOLDER_SQL_MIGRATIONS, files[i]);
         if (path_len < 0 || (size_t)path_len >= sizeof(path))
-            migration_fatal(conn, "migration path is too long");
+            migration_fatal(db, "migration path is too long");
 
         char* sql = read_file_migrate(path);
         if (!sql)
-            migration_fatal(conn, "failed to read migration file");
+            migration_fatal(db, "failed to read migration file");
 
         char checksum[17];
         migration_checksum(sql, checksum);
@@ -257,7 +275,7 @@ void run_migrations(PGconn* conn)
         snprintf(version_str, sizeof(version_str), "%d", version);
         const char* check_params[1] = {version_str};
 
-        res = db_exec_params(conn,
+        res = db_exec_params(db,
             "SELECT name, checksum FROM schema_migrations WHERE version = $1::int",
             1,
             check_params);
@@ -267,7 +285,7 @@ void run_migrations(PGconn* conn)
             free(sql);
             if (res)
                 PQclear(res);
-            migration_fatal(conn, "failed to inspect migration state");
+            migration_fatal(db, "failed to inspect migration state");
         }
 
         if (PQntuples(res) > 0)
@@ -278,13 +296,13 @@ void run_migrations(PGconn* conn)
             if (stored_checksum && strcmp(stored_checksum, checksum) != 0)
             {
                 free(sql);
-                migration_fatal(conn, "applied migration checksum mismatch");
+                migration_fatal(db, "applied migration checksum mismatch");
             }
 
             if (!stored_checksum)
             {
                 const char* update_params[3] = {files[i], checksum, version_str};
-                res = db_exec_params(conn,
+                res = db_exec_params(db,
                     "UPDATE schema_migrations SET name = $1, checksum = $2 WHERE version = $3::int",
                     3,
                     update_params);
@@ -293,7 +311,7 @@ void run_migrations(PGconn* conn)
                     free(sql);
                     if (res)
                         PQclear(res);
-                    migration_fatal(conn, "failed to backfill migration metadata");
+                    migration_fatal(db, "failed to backfill migration metadata");
                 }
                 PQclear(res);
             }
@@ -307,33 +325,33 @@ void run_migrations(PGconn* conn)
 
         logger_info("Applying migration %s", files[i]);
 
-        res = db_exec(conn, "BEGIN");
+        res = db_exec(db, "BEGIN");
         if (!command_ok(res))
         {
             free(sql);
             if (res)
                 PQclear(res);
-            migration_fatal(conn, "failed to start migration transaction");
+            migration_fatal(db, "failed to start migration transaction");
         }
         PQclear(res);
 
-        res = db_exec(conn, sql);
+        res = db_exec(db, sql);
         free(sql);
 
         if (!command_ok(res))
         {
-            logger_error("run_migrations: migration %s failed: %s", files[i], PQerrorMessage(conn));
+            logger_error("run_migrations: migration %s failed: %s", files[i], db_error_message(db));
             if (res)
                 PQclear(res);
-            res = db_exec(conn, "ROLLBACK");
+            res = db_exec(db, "ROLLBACK");
             if (res)
                 PQclear(res);
-            migration_fatal(conn, "migration execution failed");
+            migration_fatal(db, "migration execution failed");
         }
         PQclear(res);
 
         const char* insert_params[3] = {version_str, files[i], checksum};
-        res = db_exec_params(conn,
+        res = db_exec_params(db,
             "INSERT INTO schema_migrations(version, name, checksum) VALUES($1::int, $2, $3)",
             3,
             insert_params);
@@ -341,19 +359,19 @@ void run_migrations(PGconn* conn)
         {
             if (res)
                 PQclear(res);
-            res = db_exec(conn, "ROLLBACK");
+            res = db_exec(db, "ROLLBACK");
             if (res)
                 PQclear(res);
-            migration_fatal(conn, "failed to record migration");
+            migration_fatal(db, "failed to record migration");
         }
         PQclear(res);
 
-        res = db_exec(conn, "COMMIT");
+        res = db_exec(db, "COMMIT");
         if (!command_ok(res))
         {
             if (res)
                 PQclear(res);
-            migration_fatal(conn, "failed to commit migration");
+            migration_fatal(db, "failed to commit migration");
         }
         PQclear(res);
 
@@ -363,7 +381,7 @@ void run_migrations(PGconn* conn)
 
     free(files);
 
-    res = db_exec(conn, "SELECT pg_advisory_unlock(" "73490127" ")");
+    res = db_exec(db, "SELECT pg_advisory_unlock(" "73490127" ")");
     if (res)
         PQclear(res);
 }

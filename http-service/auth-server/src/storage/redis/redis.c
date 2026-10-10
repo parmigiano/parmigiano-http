@@ -23,6 +23,18 @@ redisReply* redis_command(const char* format, ...)
     return reply;
 }
 
+redisReply* redis_command_argv(int argc, const char** argv, const size_t* argvlen)
+{
+    if (!redis || argc <= 0 || !argv)
+        return NULL;
+
+    pthread_mutex_lock(&redis_mutex);
+    redisReply* reply = redisCommandArgv(redis, argc, argv, argvlen);
+    pthread_mutex_unlock(&redis_mutex);
+
+    return reply;
+}
+
 int redis_conn(void)
 {
     const char* host_env = getenv("REDIS_HOST");

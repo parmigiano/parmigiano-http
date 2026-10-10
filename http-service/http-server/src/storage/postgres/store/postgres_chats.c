@@ -3,7 +3,7 @@
 
 #include "logger.h"
 
-db_result_t db_chat_create(PGconn* conn, chat_t* chat, uint64_t* out_chat_id)
+db_result_t db_chat_create(db_t* db, chat_t* chat, uint64_t* out_chat_id)
 {
     const char* query = "INSERT INTO chats (chat_type, title, description) VALUES ($1, $2, $3) RETURNING id";
     const char* params[3] = {chat->chat_type, chat->title, chat->description ? chat->description : ""};
@@ -13,9 +13,9 @@ db_result_t db_chat_create(PGconn* conn, chat_t* chat, uint64_t* out_chat_id)
 
     while (1)
     {
-        PGresult* res = db_exec_params(conn, query, 3, params);
+        PGresult* res = db_exec_params(db, query, 3, params);
         if (!res)
-            return DB_ERROR;
+            return db_last_result();
 
         ExecStatusType status = PQresultStatus(res);
 
@@ -37,8 +37,9 @@ db_result_t db_chat_create(PGconn* conn, chat_t* chat, uint64_t* out_chat_id)
         if (status == PGRES_FATAL_ERROR)
         {
             logger_error("db_chat_create: failed to exec sql: %s", PQresultErrorMessage(res));
+            db_result_t fatal = db_fatal_result(res);
             PQclear(res);
-            return DB_ERROR;
+            return fatal;
         }
 
         PQclear(res);
@@ -48,7 +49,7 @@ db_result_t db_chat_create(PGconn* conn, chat_t* chat, uint64_t* out_chat_id)
     }
 }
 
-db_result_t db_chat_create_members(PGconn* conn, uint64_t chat_id, chat_member_t* members, size_t members_count)
+db_result_t db_chat_create_members(db_t* db, uint64_t chat_id, chat_member_t* members, size_t members_count)
 {
     const char* query = "INSERT INTO chat_members (chat_id, user_uid, role) SELECT $1, u, r FROM unnest($2::bigint[], $3::text[]) AS t(u, r)";
 
@@ -82,16 +83,16 @@ db_result_t db_chat_create_members(PGconn* conn, uint64_t chat_id, chat_member_t
 
     const char* params[3] = {chat_id_str, user_uids, roles};
 
-    db_result_t result = execute_sql(conn, query, params, 3);
+    db_result_t result = execute_sql(db, query, params, 3);
     if (result != DB_OK)
     {
-        logger_error("db_chat_create_members chat_id={%lu}: failed to exec sql: %s", chat_id, PQerrorMessage(conn));
+        logger_error("db_chat_create_members chat_id={%lu}: failed to exec sql: %s", chat_id, db_error_message(db));
     }
 
     return result;
 }
 
-db_result_t db_chat_create_setting(PGconn* conn, uint64_t chat_id, chat_setting_t* setting)
+db_result_t db_chat_create_setting(db_t* db, uint64_t chat_id, chat_setting_t* setting)
 {
     const char* query = "INSERT INTO chat_settings (chat_id) VALUES ($1)";
 
@@ -101,51 +102,62 @@ db_result_t db_chat_create_setting(PGconn* conn, uint64_t chat_id, chat_setting_
 
     const char* params[1] = {chat_id_str};
 
-    db_result_t result = execute_sql(conn, query, params, 1);
+    db_result_t result = execute_sql(db, query, params, 1);
     if (result != DB_OK)
     {
-        logger_error("db_chat_create_setting chat_id={%lu}: failed to exec sql: %s", chat_id, PQerrorMessage(conn));
+        logger_error("db_chat_create_setting chat_id={%lu}: failed to exec sql: %s", chat_id, db_error_message(db));
     }
 
     return result;
 }
 
-db_result_t db_chat_create_all(PGconn* conn, chat_t* chat, chat_member_t* members, size_t members_count, chat_setting_t* setting,
-                               uint64_t* out_chat_id)
-{
-    execute_sql(conn, "BEGIN", NULL, 0);
-
-    db_result_t rc;
-
+typedef struct {
+    chat_t* chat;
+    chat_member_t* members;
+    size_t members_count;
+    chat_setting_t* setting;
     uint64_t chat_id;
-    rc = db_chat_create(conn, chat, &chat_id);
+} db_chat_create_all_args_t;
+
+static db_result_t db_chat_create_all_tx(db_t* db, void* arg)
+{
+    db_chat_create_all_args_t* args = arg;
+    db_result_t rc = db_chat_create(db, args->chat, &args->chat_id);
     if (rc != DB_OK)
-        goto rollback;
+        return rc;
 
-    rc = db_chat_create_setting(conn, chat_id, setting);
+    rc = db_chat_create_setting(db, args->chat_id, args->setting);
     if (rc != DB_OK)
-        goto rollback;
+        return rc;
 
-    rc = db_chat_create_members(conn, chat_id, members, members_count);
-    if (rc != DB_OK)
-        goto rollback;
-
-    execute_sql(conn, "COMMIT", NULL, 0);
-
-    if (out_chat_id)
-        *out_chat_id = chat_id;
-
-    return DB_OK;
-
-rollback:
-    logger_error("db_chat_create_all chat_id={%lu}: failed to exec sql: %s", chat_id ? chat_id : 0, PQerrorMessage(conn));
-
-    execute_sql(conn, "ROLLBACK", NULL, 0);
-
-    return DB_ERROR;
+    return db_chat_create_members(db, args->chat_id, args->members, args->members_count);
 }
 
-chat_preview_LIST_t* db_chat_get_my_history(PGconn* conn, uint64_t user_uid, size_t offset)
+db_result_t db_chat_create_all(db_t* db, chat_t* chat, chat_member_t* members, size_t members_count, chat_setting_t* setting,
+                               uint64_t* out_chat_id)
+{
+    db_chat_create_all_args_t args = {
+        .chat = chat,
+        .members = members,
+        .members_count = members_count,
+        .setting = setting,
+        .chat_id = 0,
+    };
+
+    db_result_t rc = db_transaction(db, db_chat_create_all_tx, &args);
+    if (rc != DB_OK)
+    {
+        logger_error("db_chat_create_all chat_id={%lu}: failed to exec sql: %s", args.chat_id, db_error_message(db));
+        return rc;
+    }
+
+    if (out_chat_id)
+        *out_chat_id = args.chat_id;
+
+    return DB_OK;
+}
+
+chat_preview_LIST_t* db_chat_get_my_history(db_t* db, uint64_t user_uid, size_t offset)
 {
     db_result_set_t* rc = NULL;
 
@@ -194,10 +206,10 @@ chat_preview_LIST_t* db_chat_get_my_history(PGconn* conn, uint64_t user_uid, siz
 
     const char* params[2] = {user_uid_str, offset_str};
 
-    db_result_t result = execute_select(conn, query, params, 2, &rc);
+    db_result_t result = execute_select(db, query, params, 2, &rc);
     if (result != DB_OK)
     {
-        logger_error("db_chat_get_my_history user_uid={%lu}: failed to exec sql: %s", user_uid, PQerrorMessage(conn));
+        logger_error("db_chat_get_my_history user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
         free_result_set(rc);
         return NULL;
     }
@@ -250,7 +262,7 @@ chat_preview_LIST_t* db_chat_get_my_history(PGconn* conn, uint64_t user_uid, siz
     return list;
 }
 
-chat_preview_LIST_t* db_chat_get_by_username(PGconn* conn, uint64_t user_uid, const char* username)
+chat_preview_LIST_t* db_chat_get_by_username(db_t* db, uint64_t user_uid, const char* username)
 {
     db_result_set_t* rc = NULL;
 
@@ -300,10 +312,10 @@ chat_preview_LIST_t* db_chat_get_by_username(PGconn* conn, uint64_t user_uid, co
 
     const char* params[2] = {user_uid_str, username};
 
-    db_result_t result = execute_select(conn, query, params, 2, &rc);
+    db_result_t result = execute_select(db, query, params, 2, &rc);
     if (result != DB_OK)
     {
-        logger_error("db_chat_get_by_username user_uid={%lu}: failed to exec sql: %s", user_uid, PQerrorMessage(conn));
+        logger_error("db_chat_get_by_username user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
         free_result_set(rc);
         return NULL;
     }
@@ -356,7 +368,7 @@ chat_preview_LIST_t* db_chat_get_by_username(PGconn* conn, uint64_t user_uid, co
     return list;
 }
 
-chat_member_LIST_t* db_chat_get_members_by_chat_id(PGconn* conn, uint64_t chat_id, uint64_t user_uid)
+chat_member_LIST_t* db_chat_get_members_by_chat_id(db_t* db, uint64_t chat_id, uint64_t user_uid)
 {
     db_result_set_t* rc = NULL;
 
@@ -374,10 +386,10 @@ chat_member_LIST_t* db_chat_get_members_by_chat_id(PGconn* conn, uint64_t chat_i
 
     const char* params[2] = {chat_id_str, user_uid_str};
 
-    db_result_t result = execute_select(conn, query, params, 2, &rc);
+    db_result_t result = execute_select(db, query, params, 2, &rc);
     if (result != DB_OK)
     {
-        logger_error("db_chat_get_members_by_chat_id chat_id={%lu} user_uid={%lu}: failed to exec sql: %s", chat_id, user_uid, PQerrorMessage(conn));
+        logger_error("db_chat_get_members_by_chat_id chat_id={%lu} user_uid={%lu}: failed to exec sql: %s", chat_id, user_uid, db_error_message(db));
         free_result_set(rc);
         return NULL;
     }
@@ -421,7 +433,7 @@ chat_member_LIST_t* db_chat_get_members_by_chat_id(PGconn* conn, uint64_t chat_i
     return list;
 }
 
-bool db_chat_get_member_exists_by_chat_id(PGconn* conn, uint64_t chat_id, uint64_t user_uid)
+bool db_chat_get_member_exists_by_chat_id(db_t* db, uint64_t chat_id, uint64_t user_uid)
 {
     db_result_set_t* rc = NULL;
 
@@ -440,11 +452,11 @@ bool db_chat_get_member_exists_by_chat_id(PGconn* conn, uint64_t chat_id, uint64
 
     const char* params[2] = {chat_id_str, user_uid_str};
 
-    db_result_t result = execute_select(conn, query, params, 2, &rc);
+    db_result_t result = execute_select(db, query, params, 2, &rc);
     if (result != DB_OK)
     {
         logger_error("db_chat_get_member_exists_by_chat_id chat_id={%lu} user_uid={%lu}: failed to exec sql: %s", chat_id, user_uid,
-                     PQerrorMessage(conn));
+                     db_error_message(db));
         free_result_set(rc);
         return false;
     }
@@ -463,7 +475,7 @@ bool db_chat_get_member_exists_by_chat_id(PGconn* conn, uint64_t chat_id, uint64
     return exists;
 }
 
-chat_setting_t* db_chat_get_setting_by_chat_id(PGconn* conn, uint64_t chat_id)
+chat_setting_t* db_chat_get_setting_by_chat_id(db_t* db, uint64_t chat_id)
 {
     db_result_set_t* rc = NULL;
 
@@ -475,10 +487,10 @@ chat_setting_t* db_chat_get_setting_by_chat_id(PGconn* conn, uint64_t chat_id)
 
     const char* params[1] = {chat_id_str};
 
-    db_result_t result = execute_select(conn, query, params, 1, &rc);
+    db_result_t result = execute_select(db, query, params, 1, &rc);
     if (result != DB_OK)
     {
-        logger_error("db_chat_get_setting_by_chat_id chat_id={%lu}: failed to exec sql: %s", chat_id, PQerrorMessage(conn));
+        logger_error("db_chat_get_setting_by_chat_id chat_id={%lu}: failed to exec sql: %s", chat_id, db_error_message(db));
         free_result_set(rc);
         return NULL;
     }
@@ -515,7 +527,7 @@ chat_setting_t* db_chat_get_setting_by_chat_id(PGconn* conn, uint64_t chat_id)
     return chat_setting;
 }
 
-db_result_t db_chat_upd_cbackground_by_chat_id(PGconn* conn, char* cbackground, uint64_t chat_id)
+db_result_t db_chat_upd_cbackground_by_chat_id(db_t* db, char* cbackground, uint64_t chat_id)
 {
     const char* query = "UPDATE chat_settings SET custom_background = $1 WHERE chat_id = $2";
 
@@ -525,10 +537,10 @@ db_result_t db_chat_upd_cbackground_by_chat_id(PGconn* conn, char* cbackground, 
 
     const char* params[2] = {cbackground, chat_id_str};
 
-    db_result_t result = execute_sql(conn, query, params, 2);
+    db_result_t result = execute_sql(db, query, params, 2);
     if (result != DB_OK)
     {
-        logger_error("db_chat_upd_cbackground_by_chat_id chat_id={%lu}: failed to exec sql: %s", chat_id, PQerrorMessage(conn));
+        logger_error("db_chat_upd_cbackground_by_chat_id chat_id={%lu}: failed to exec sql: %s", chat_id, db_error_message(db));
     }
 
     return result;

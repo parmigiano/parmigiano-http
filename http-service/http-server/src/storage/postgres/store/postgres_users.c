@@ -3,7 +3,7 @@
 
 #include "logger.h"
 
-db_result_t db_user_core_create(PGconn* conn, user_core_t* user)
+db_result_t db_user_core_create(db_t* db, user_core_t* user)
 {
     const char* query = "INSERT INTO user_cores (user_uid, email, password, email_confirm) VALUES ($1, $2, $3, $4)";
 
@@ -15,16 +15,16 @@ db_result_t db_user_core_create(PGconn* conn, user_core_t* user)
 
     const char* params[4] = {user_uid_str, user->email, user->password, email_confirm_str};
 
-    db_result_t result = execute_sql(conn, query, params, 4);
+    db_result_t result = execute_sql(db, query, params, 4);
     if (result != DB_OK)
     {
-        logger_error("db_user_core_create user_uid={%lu}: failed to exec sql: %s", user->user_uid ? user->user_uid : 0, PQerrorMessage(conn));
+        logger_error("db_user_core_create user_uid={%lu}: failed to exec sql: %s", user->user_uid ? user->user_uid : 0, db_error_message(db));
     }
 
     return result;
 }
 
-db_result_t db_user_profile_create(PGconn* conn, user_profile_t* user)
+db_result_t db_user_profile_create(db_t* db, user_profile_t* user)
 {
     const char* query = "INSERT INTO user_profiles (user_uid, avatar, name, username) VALUES ($1, $2, $3, $4)";
 
@@ -34,16 +34,16 @@ db_result_t db_user_profile_create(PGconn* conn, user_profile_t* user)
 
     const char* params[4] = {user_uid_str, user->avatar, user->name, user->username};
 
-    db_result_t result = execute_sql(conn, query, params, 4);
+    db_result_t result = execute_sql(db, query, params, 4);
     if (result != DB_OK)
     {
-        logger_error("db_user_profile_create user_uid={%lu}: failed to exec sql: %s", user->user_uid ? user->user_uid : 0, PQerrorMessage(conn));
+        logger_error("db_user_profile_create user_uid={%lu}: failed to exec sql: %s", user->user_uid ? user->user_uid : 0, db_error_message(db));
     }
 
     return result;
 }
 
-db_result_t db_user_profile_access_create(PGconn* conn, user_profile_access_t* user)
+db_result_t db_user_profile_access_create(db_t* db, user_profile_access_t* user)
 {
     const char* query = "INSERT INTO user_profile_accesses (user_uid, email_visible, "
                         "username_visible, phone_visible) VALUES ($1, $2, $3, $4)";
@@ -55,17 +55,17 @@ db_result_t db_user_profile_access_create(PGconn* conn, user_profile_access_t* u
     const char* params[4] = {user_uid_str, user->email_visible ? "true" : "false", user->username_visible ? "true" : "false",
                              user->phone_visible ? "true" : "false"};
 
-    db_result_t result = execute_sql(conn, query, params, 4);
+    db_result_t result = execute_sql(db, query, params, 4);
     if (result != DB_OK)
     {
         logger_error("db_user_profile_access_create user_uid={%lu}: failed to exec sql: %s", user->user_uid ? user->user_uid : 0,
-                     PQerrorMessage(conn));
+                     db_error_message(db));
     }
 
     return result;
 }
 
-db_result_t db_user_profile_active_create(PGconn* conn, user_active_t* user)
+db_result_t db_user_profile_active_create(db_t* db, user_active_t* user)
 {
     const char* query = "INSERT INTO user_actives (user_uid) VALUES ($1)";
 
@@ -75,52 +75,60 @@ db_result_t db_user_profile_active_create(PGconn* conn, user_active_t* user)
 
     const char* params[1] = {user_uid_str};
 
-    db_result_t result = execute_sql(conn, query, params, 1);
+    db_result_t result = execute_sql(db, query, params, 1);
     if (result != DB_OK)
     {
         logger_error("db_user_profile_active_create user_uid={%lu}: failed to exec sql: %s", user->user_uid ? user->user_uid : 0,
-                     PQerrorMessage(conn));
+                     db_error_message(db));
     }
 
     return result;
 }
 
-db_result_t db_user_create(PGconn* conn, user_core_t* user_core, user_profile_t* user_profile, user_profile_access_t* user_profile_access,
-                           user_active_t* user_active)
-{
-    execute_sql(conn, "BEGIN", NULL, 0);
+typedef struct {
+    user_core_t* user_core;
+    user_profile_t* user_profile;
+    user_profile_access_t* user_profile_access;
+    user_active_t* user_active;
+} db_user_create_args_t;
 
+static db_result_t db_user_create_tx(db_t* db, void* arg)
+{
+    db_user_create_args_t* args = arg;
     db_result_t rc;
 
-    rc = db_user_core_create(conn, user_core);
+    rc = db_user_core_create(db, args->user_core);
     if (rc != DB_OK)
-        goto rollback;
+        return rc;
 
-    rc = db_user_profile_create(conn, user_profile);
+    rc = db_user_profile_create(db, args->user_profile);
     if (rc != DB_OK)
-        goto rollback;
+        return rc;
 
-    rc = db_user_profile_access_create(conn, user_profile_access);
+    rc = db_user_profile_access_create(db, args->user_profile_access);
     if (rc != DB_OK)
-        goto rollback;
+        return rc;
 
-    rc = db_user_profile_active_create(conn, user_active);
-    if (rc != DB_OK)
-        goto rollback;
-
-    execute_sql(conn, "COMMIT", NULL, 0);
-
-    return DB_OK;
-
-rollback:
-    logger_error("db_user_create: failed to exec sql: %s", PQerrorMessage(conn));
-
-    execute_sql(conn, "ROLLBACK", NULL, 0);
-
-    return DB_ERROR;
+    return db_user_profile_active_create(db, args->user_active);
 }
 
-user_info_t* db_user_info_get_by_uid(PGconn* conn, uint64_t user_uid)
+db_result_t db_user_create(db_t* db, user_core_t* user_core, user_profile_t* user_profile, user_profile_access_t* user_profile_access, user_active_t* user_active)
+{
+    db_user_create_args_t args = {
+        .user_core = user_core,
+        .user_profile = user_profile,
+        .user_profile_access = user_profile_access,
+        .user_active = user_active,
+    };
+
+    db_result_t rc = db_transaction(db, db_user_create_tx, &args);
+    if (rc != DB_OK)
+        logger_error("db_user_create: failed to exec sql: %s", db_error_message(db));
+
+    return rc;
+}
+
+user_info_t* db_user_info_get_by_uid(db_t* db, uint64_t user_uid)
 {
     db_result_set_t* rc = NULL;
 
@@ -150,10 +158,10 @@ user_info_t* db_user_info_get_by_uid(PGconn* conn, uint64_t user_uid)
 
     const char* params[1] = {user_uid_str};
 
-    db_result_t result = execute_select(conn, query, params, 1, &rc);
+    db_result_t result = execute_select(db, query, params, 1, &rc);
     if (result != DB_OK)
     {
-        logger_error("db_user_info_get_by_uid user_uid={%lu}: failed to exec sql: %s", user_uid, PQerrorMessage(conn));
+        logger_error("db_user_info_get_by_uid user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
         free_result_set(rc);
         return NULL;
     }
@@ -211,17 +219,17 @@ void db_user_info_free(user_info_t* user)
     free(user);
 }
 
-user_core_t* db_user_core_get_by_email(PGconn* conn, char* email)
+user_core_t* db_user_core_get_by_email(db_t* db, char* email)
 {
     db_result_set_t* rc = NULL;
 
     const char* query = "SELECT * FROM user_cores WHERE email = $1 LIMIT 1";
     const char* params[1] = {email};
 
-    db_result_t result = execute_select(conn, query, params, 1, &rc);
+    db_result_t result = execute_select(db, query, params, 1, &rc);
     if (result != DB_OK)
     {
-        logger_error("db_user_core_get_by_email email={%s}: failed to exec sql: %s", email, PQerrorMessage(conn));
+        logger_error("db_user_core_get_by_email email={%s}: failed to exec sql: %s", email, db_error_message(db));
         free_result_set(rc);
         return NULL;
     }
@@ -258,7 +266,7 @@ user_core_t* db_user_core_get_by_email(PGconn* conn, char* email)
     return user;
 }
 
-user_core_t* db_user_core_get_by_uid(PGconn* conn, uint64_t user_uid)
+user_core_t* db_user_core_get_by_uid(db_t* db, uint64_t user_uid)
 {
     db_result_set_t* rc = NULL;
 
@@ -271,10 +279,10 @@ user_core_t* db_user_core_get_by_uid(PGconn* conn, uint64_t user_uid)
 
     const char* params[1] = {user_uid_str};
 
-    db_result_t result = execute_select(conn, query, params, 1, &rc);
+    db_result_t result = execute_select(db, query, params, 1, &rc);
     if (result != DB_OK)
     {
-        logger_error("db_user_core_get_by_uid user_uid={%lu}: failed to exec sql: %s", user_uid, PQerrorMessage(conn));
+        logger_error("db_user_core_get_by_uid user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
         free_result_set(rc);
         return NULL;
     }
@@ -309,21 +317,21 @@ user_core_t* db_user_core_get_by_uid(PGconn* conn, uint64_t user_uid)
     return user;
 }
 
-db_result_t db_user_core_upd_email_confirm(PGconn* conn, bool confirm, char* email)
+db_result_t db_user_core_upd_email_confirm(db_t* db, bool confirm, char* email)
 {
     const char* query = "UPDATE user_cores SET email_confirm = $1 WHERE email = $2";
     const char* params[2] = {confirm ? "true" : "false", email};
 
-    db_result_t result = execute_sql(conn, query, params, 2);
+    db_result_t result = execute_sql(db, query, params, 2);
     if (result != DB_OK)
     {
-        logger_error("db_user_core_upd_email_confirm email={%s}: failed to exec sql: %s", email, PQerrorMessage(conn));
+        logger_error("db_user_core_upd_email_confirm email={%s}: failed to exec sql: %s", email, db_error_message(db));
     }
 
     return result;
 }
 
-db_result_t db_user_profile_upd_avatar_by_uid(PGconn* conn, uint64_t user_uid, char* avatar)
+db_result_t db_user_profile_upd_avatar_by_uid(db_t* db, uint64_t user_uid, char* avatar)
 {
     const char* query = "UPDATE user_profiles SET avatar = $1 WHERE user_uid = $2";
 
@@ -333,16 +341,16 @@ db_result_t db_user_profile_upd_avatar_by_uid(PGconn* conn, uint64_t user_uid, c
 
     const char* params[2] = {avatar, user_uid_str};
 
-    db_result_t result = execute_sql(conn, query, params, 2);
+    db_result_t result = execute_sql(db, query, params, 2);
     if (result != DB_OK)
     {
-        logger_error("db_user_profile_upd_avatar_by_uid user_uid={%lu}: failed to exec sql: %s", user_uid, PQerrorMessage(conn));
+        logger_error("db_user_profile_upd_avatar_by_uid user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
     }
 
     return result;
 }
 
-db_result_t db_user_profile_access_upd_by_uid(PGconn* conn, uint64_t user_uid, user_profile_update_t* user)
+db_result_t db_user_profile_access_upd_by_uid(db_t* db, uint64_t user_uid, user_profile_update_t* user)
 {
     char query[512];
     const char* params[5];
@@ -383,16 +391,16 @@ db_result_t db_user_profile_access_upd_by_uid(PGconn* conn, uint64_t user_uid, u
     snprintf(query + strlen(query), sizeof(query) - strlen(query), " WHERE user_uid=$%d", i);
     params[param_count++] = user_uid_str;
 
-    db_result_t result = execute_sql(conn, query, params, param_count);
+    db_result_t result = execute_sql(db, query, params, param_count);
     if (result != DB_OK)
     {
-        logger_error("db_user_profile_access_upd_by_uid user_uid={%lu}: failed to exec sql: %s", user_uid, PQerrorMessage(conn));
+        logger_error("db_user_profile_access_upd_by_uid user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
     }
 
     return result;
 }
 
-db_result_t db_user_profile_upd_by_uid(PGconn* conn, uint64_t user_uid, user_profile_update_t* user)
+db_result_t db_user_profile_upd_by_uid(db_t* db, uint64_t user_uid, user_profile_update_t* user)
 {
     char query[512];
     const char* params[6];
@@ -440,16 +448,16 @@ db_result_t db_user_profile_upd_by_uid(PGconn* conn, uint64_t user_uid, user_pro
     snprintf(query + strlen(query), sizeof(query) - strlen(query), " WHERE user_uid=$%d", i);
     params[param_count++] = user_uid_str;
 
-    db_result_t result = execute_sql(conn, query, params, param_count);
+    db_result_t result = execute_sql(db, query, params, param_count);
     if (result != DB_OK)
     {
-        logger_error("db_user_profile_upd_by_uid user_uid={%lu}: failed to exec sql: %s", user_uid, PQerrorMessage(conn));
+        logger_error("db_user_profile_upd_by_uid user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
     }
 
     return result;
 }
 
-db_result_t db_user_core_upd_by_uid(PGconn* conn, uint64_t user_uid, user_profile_update_t* user)
+db_result_t db_user_core_upd_by_uid(db_t* db, uint64_t user_uid, user_profile_update_t* user)
 {
     char query[512];
     const char* params[4];
@@ -483,49 +491,54 @@ db_result_t db_user_core_upd_by_uid(PGconn* conn, uint64_t user_uid, user_profil
     snprintf(query + strlen(query), sizeof(query) - strlen(query), " WHERE user_uid=$%d", i);
     params[param_count++] = user_uid_str;
 
-    db_result_t result = execute_sql(conn, query, params, param_count);
+    db_result_t result = execute_sql(db, query, params, param_count);
     if (result != DB_OK)
     {
-        logger_error("db_user_core_upd_by_uid user_uid={%lu}: failed to exec sql: %s", user_uid, PQerrorMessage(conn));
+        logger_error("db_user_core_upd_by_uid user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
     }
 
     return result;
 }
 
-db_result_t db_user_UPDATE_upd(PGconn* conn, uint64_t user_uid, user_profile_update_t* user)
+typedef struct {
+    uint64_t user_uid;
+    user_profile_update_t* user;
+} db_user_update_args_t;
+
+static db_result_t db_user_update_tx(db_t* db, void* arg)
 {
-    if (!conn)
-        return DB_ERROR;
-
-    execute_sql(conn, "BEGIN", NULL, 0);
-
+    db_user_update_args_t* args = arg;
     db_result_t rc;
 
-    rc = db_user_core_upd_by_uid(conn, user_uid, user);
+    rc = db_user_core_upd_by_uid(db, args->user_uid, args->user);
     if (rc != DB_OK)
-        goto rollback;
+        return rc;
 
-    rc = db_user_profile_upd_by_uid(conn, user_uid, user);
+    rc = db_user_profile_upd_by_uid(db, args->user_uid, args->user);
     if (rc != DB_OK)
-        goto rollback;
+        return rc;
 
-    rc = db_user_profile_access_upd_by_uid(conn, user_uid, user);
-    if (rc != DB_OK)
-        goto rollback;
-
-    execute_sql(conn, "COMMIT", NULL, 0);
-
-    return DB_OK;
-
-rollback:
-    logger_error("db_user_UPDATE_upd user_uid={%lu}: failed to exec sql: %s", user_uid, PQerrorMessage(conn));
-
-    execute_sql(conn, "ROLLBACK", NULL, 0);
-
-    return DB_ERROR;
+    return db_user_profile_access_upd_by_uid(db, args->user_uid, args->user);
 }
 
-db_result_t db_user_del_by_uid(PGconn* conn, uint64_t user_uid)
+db_result_t db_user_UPDATE_upd(db_t* db, uint64_t user_uid, user_profile_update_t* user)
+{
+    if (!db)
+        return DB_ERROR;
+
+    db_user_update_args_t args = {
+        .user_uid = user_uid,
+        .user = user,
+    };
+
+    db_result_t rc = db_transaction(db, db_user_update_tx, &args);
+    if (rc != DB_OK)
+        logger_error("db_user_UPDATE_upd user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
+
+    return rc;
+}
+
+db_result_t db_user_del_by_uid(db_t* db, uint64_t user_uid)
 {
     const char* query = "DELETE FROM user_cores WHERE user_uid = $1";
 
@@ -534,10 +547,10 @@ db_result_t db_user_del_by_uid(PGconn* conn, uint64_t user_uid)
 
     const char* params[1] = {user_uid_str};
 
-    db_result_t result = execute_sql(conn, query, params, 1);
+    db_result_t result = execute_sql(db, query, params, 1);
     if (result != DB_OK)
     {
-        logger_error("db_user_del_by_uid user_uid={%lu}: failed to exec sql: %s", user_uid, PQerrorMessage(conn));
+        logger_error("db_user_del_by_uid user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
     }
 
     return result;

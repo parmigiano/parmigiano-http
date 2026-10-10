@@ -84,8 +84,8 @@ void http_init(void)
     }
 
     /* Database connection (migrations are owned by http-server) */
-    app_context->conn = db_conn();
-    if (!app_context->conn)
+    app_context->db = db_open_env();
+    if (!app_context->db)
     {
         logger_error("http_init: failed to connect to database");
         fprintf(stderr, "failed to connect to database\n");
@@ -142,10 +142,10 @@ static void _http_cleanup(void)
     MMDB_close(&app_context->geoip);
 
 	/* PostgreSQL */
-	if (app_context->conn)
+	if (app_context->db)
     {
-        db_close(app_context->conn);
-        app_context->conn = NULL;
+        db_close(app_context->db);
+        app_context->db = NULL;
     }
 
 	/* Redis */

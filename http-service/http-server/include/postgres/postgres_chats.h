@@ -60,24 +60,24 @@ typedef struct {
 /* table. CHATS */
 
 /* Create chat and return chat id */
-db_result_t db_chat_create(PGconn* conn, chat_t* chat, uint64_t* out_chat_id);
+db_result_t db_chat_create(db_t* db, chat_t* chat, uint64_t* out_chat_id);
 /* Create chat member */
-db_result_t db_chat_create_members(PGconn* conn, uint64_t chat_id, chat_member_t* members, size_t members_count);
+db_result_t db_chat_create_members(db_t* db, uint64_t chat_id, chat_member_t* members, size_t members_count);
 /* Create chat setting */
-db_result_t db_chat_create_setting(PGconn* conn, uint64_t chat_id, chat_setting_t* setting);
+db_result_t db_chat_create_setting(db_t* db, uint64_t chat_id, chat_setting_t* setting);
 /* Create chat WITH transaction */
-db_result_t db_chat_create_all(PGconn* conn, chat_t* chat, chat_member_t* members, size_t members_count, chat_setting_t* setting, uint64_t* out_chat_id);
+db_result_t db_chat_create_all(db_t* db, chat_t* chat, chat_member_t* members, size_t members_count, chat_setting_t* setting, uint64_t* out_chat_id);
 /* Get my history chats [limit 15 chats] */
-chat_preview_LIST_t* db_chat_get_my_history(PGconn* conn, uint64_t user_uid, size_t offset);
+chat_preview_LIST_t* db_chat_get_my_history(db_t* db, uint64_t user_uid, size_t offset);
 /* Get chats/users bu username */
-chat_preview_LIST_t* db_chat_get_by_username(PGconn* conn, uint64_t user_uid, const char* username);
+chat_preview_LIST_t* db_chat_get_by_username(db_t* db, uint64_t user_uid, const char* username);
 /* Get chat members by chat_id */
-chat_member_LIST_t* db_chat_get_members_by_chat_id(PGconn* conn, uint64_t chat_id, uint64_t user_uid);
+chat_member_LIST_t* db_chat_get_members_by_chat_id(db_t* db, uint64_t chat_id, uint64_t user_uid);
 /* Check exists or nah user in chat members by chat_id */
-bool db_chat_get_member_exists_by_chat_id(PGconn* conn, uint64_t chat_id, uint64_t user_uid);
+bool db_chat_get_member_exists_by_chat_id(db_t* db, uint64_t chat_id, uint64_t user_uid);
 /* Get chat settings by chat_id */
-chat_setting_t* db_chat_get_setting_by_chat_id(PGconn* conn, uint64_t chat_id);
+chat_setting_t* db_chat_get_setting_by_chat_id(db_t* db, uint64_t chat_id);
 /* Update chat custom background by chat_id */
-db_result_t db_chat_upd_cbackground_by_chat_id(PGconn* conn, char* cbackground, uint64_t chat_id);
+db_result_t db_chat_upd_cbackground_by_chat_id(db_t* db, char* cbackground, uint64_t chat_id);
 
 #endif

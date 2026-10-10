@@ -42,7 +42,7 @@
     },
     "/auth/login": {
       "post": {
-        "summary": "Login with an email confirmation token and account password when configured",
+        "summary": "Login with email, password, and a one-time login token from /auth/verify",
         "tags": [
           "Auth"
         ],
@@ -89,12 +89,22 @@
               }
             }
           },
-          "202": {
-            "description": "Password required",
+          "401": {
+            "description": "Incorrect password",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MessageResponse"
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Login token is missing, expired or does not match the email, or the account has no password",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
                 }
               }
             }
@@ -134,7 +144,7 @@
     },
     "/auth/create": {
       "post": {
-        "summary": "Only account registration, the user is created after the email is verified",
+        "summary": "Create an account with a one-time registration token from /auth/verify",
         "tags": [
           "Auth"
         ],
@@ -182,7 +192,17 @@
             }
           },
           "400": {
-            "description": "Validation error",
+            "description": "Validation error or the email is already registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Registration token is missing, expired or does not match the email",
             "content": {
               "application/json": {
                 "schema": {
@@ -278,7 +298,7 @@
     },
     "/auth/verify": {
       "post": {
-        "summary": "Verification code before send request",
+        "summary": "Consume the email code and return the next step",
         "tags": [
           "Auth"
         ],
@@ -316,37 +336,27 @@
         },
         "responses": {
           "200": {
-            "description": "Sending a session ID if the user is logged in and does not have a cloud password",
+            "description": "Code accepted. Branch on next: registration, password, or authenticated",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MessageResponse"
-                }
-              }
-            }
-          },
-          "202": {
-            "description": "Email verified.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MessageResponse"
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/AuthNextRegistration"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AuthNextPassword"
+                    },
+                    {
+                      "$ref": "#/components/schemas/AuthNextAuthenticated"
+                    }
+                  ]
                 }
               }
             }
           },
           "400": {
-            "description": "Validation error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorResponse"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "Email code is missing, expired or already consumed",
+            "description": "Validation error, or the code is invalid, expired, or already used",
             "content": {
               "application/json": {
                 "schema": {
@@ -448,7 +458,8 @@
       "AuthLogin": {
         "type": "object",
         "required": [
-          "email"
+          "email",
+          "login_token"
         ],
         "properties": {
           "email": {
@@ -461,6 +472,11 @@
             "type": "string",
             "minLength": 8,
             "maxLength": 16
+          },
+          "login_token": {
+            "type": "string",
+            "description": "One-time token from /auth/verify when next is password. Leave empty in Swagger to reuse the last verify response.",
+            "example": ""
           }
         }
       },
@@ -469,7 +485,8 @@
         "required": [
           "name",
           "username",
-          "email"
+          "email",
+          "registration_token"
         ],
         "properties": {
           "name": {
@@ -485,6 +502,11 @@
           "password": {
             "type": "string",
             "minLength": 8
+          },
+          "registration_token": {
+            "type": "string",
+            "description": "One-time token from /auth/verify when next is registration. Leave empty in Swagger to reuse the last verify response.",
+            "example": ""
           }
         }
       },
@@ -514,6 +536,75 @@
           "code": {
             "type": "integer",
             "example": 123456
+          }
+        }
+      },
+      "AuthNextRegistration": {
+        "type": "object",
+        "required": [
+          "next",
+          "registration_token",
+          "expires_in"
+        ],
+        "properties": {
+          "next": {
+            "type": "string",
+            "enum": [
+              "registration"
+            ]
+          },
+          "registration_token": {
+            "type": "string"
+          },
+          "expires_in": {
+            "type": "integer",
+            "example": 600
+          }
+        }
+      },
+      "AuthNextPassword": {
+        "type": "object",
+        "required": [
+          "next",
+          "login_token",
+          "expires_in"
+        ],
+        "properties": {
+          "next": {
+            "type": "string",
+            "enum": [
+              "password"
+            ]
+          },
+          "login_token": {
+            "type": "string"
+          },
+          "expires_in": {
+            "type": "integer",
+            "example": 600
+          }
+        }
+      },
+      "AuthNextAuthenticated": {
+        "type": "object",
+        "required": [
+          "next",
+          "session_id",
+          "expires_in"
+        ],
+        "properties": {
+          "next": {
+            "type": "string",
+            "enum": [
+              "authenticated"
+            ]
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "expires_in": {
+            "type": "integer",
+            "example": 172800
           }
         }
       },

@@ -24,12 +24,12 @@ void db_moderation_target_free(moderation_target_t* target)
     free(target);
 }
 
-db_result_t db_moderation_target_get(PGconn* conn,
+db_result_t db_moderation_target_get(db_t* db,
                                       const char* target_type,
                                       uint64_t target_id,
                                       moderation_target_t** out_target)
 {
-    if (!conn || !out_target || !moderation_target_type_valid(target_type) || target_id == 0)
+    if (!db || !out_target || !moderation_target_type_valid(target_type) || target_id == 0)
         return DB_ERROR;
 
     *out_target = NULL;
@@ -59,16 +59,17 @@ db_result_t db_moderation_target_get(PGconn* conn,
     snprintf(target_id_str, sizeof(target_id_str), "%" PRIu64, target_id);
     const char* params[1] = {target_id_str};
 
-    PGresult* result = db_exec_params(conn, query, 1, params);
+    PGresult* result = db_exec_params(db, query, 1, params);
     if (!result)
-        return DB_ERROR;
+        return db_last_result();
 
     if (PQresultStatus(result) != PGRES_TUPLES_OK)
     {
         logger_error("db_moderation_target_get target_type={%s} target_id={%" PRIu64 "}: %s",
                      target_type, target_id, PQresultErrorMessage(result));
+        db_result_t fatal = db_fatal_result(result);
         PQclear(result);
-        return DB_ERROR;
+        return fatal;
     }
 
     if (PQntuples(result) == 0)
@@ -172,12 +173,12 @@ static const char* moderation_apply_query(void)
         "FROM stats s JOIN blocked b USING (user_uid)";
 }
 
-db_result_t db_moderation_apply_violation(PGconn* conn,
+db_result_t db_moderation_apply_violation(db_t* db,
                                            const moderation_target_t* target,
                                            uint64_t reporter_uid,
                                            moderation_apply_result_t* out_result)
 {
-    if (!conn || !target || !out_result || !target->content_ref ||
+    if (!db || !target || !out_result || !target->content_ref ||
         !moderation_target_type_valid(target->target_type) ||
         !target->user_uid || !target->target_id)
         return DB_ERROR;
@@ -201,16 +202,17 @@ db_result_t db_moderation_apply_violation(PGconn* conn,
         target_id_str,
     };
 
-    PGresult* result = db_exec_params(conn, moderation_apply_query(), 5, params);
+    PGresult* result = db_exec_params(db, moderation_apply_query(), 5, params);
     if (!result)
-        return DB_ERROR;
+        return db_last_result();
 
     if (PQresultStatus(result) != PGRES_TUPLES_OK)
     {
         logger_error("db_moderation_apply_violation target_type={%s} target_id={%" PRIu64 "}: %s",
                      target->target_type, target->target_id, PQresultErrorMessage(result));
+        db_result_t fatal = db_fatal_result(result);
         PQclear(result);
-        return DB_ERROR;
+        return fatal;
     }
 
     if (PQntuples(result) == 0)

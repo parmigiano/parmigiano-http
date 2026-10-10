@@ -74,8 +74,43 @@ static inline bool parse_pg_bool(const char* s)
     return s && (s[0] == 't' || s[0] == '1');
 }
 
-PGconn* db_conn(void);
-void db_close(PGconn* conn);
+typedef struct db_config {
+    const char* host;
+    const char* port;
+    const char* dbname;
+    const char* user;
+    const char* password;
+    int max_open;
+    int max_idle;
+    int min_idle;
+    int acquire_timeout_ms;
+    int connect_timeout_ms;
+    int statement_timeout_ms;
+    int max_lifetime_sec;
+    int max_idle_time_sec;
+} db_config_t;
+
+typedef struct db db_t;
+
+typedef db_result_t (*db_tx_fn)(db_t* db, void* arg);
+
+db_t* db_open(const db_config_t* config);
+db_t* db_open_env(void);
+void db_close(db_t* db);
+
+
+db_result_t db_transaction(db_t* db, db_tx_fn fn, void* arg);
+db_result_t db_hold(db_t* db, db_tx_fn fn, void* arg);
+const char* db_error_message(db_t* db);
+db_result_t db_last_result(void);
+
+static inline db_result_t db_fatal_result(PGresult* res)
+{
+    const char* sqlstate = res ? PQresultErrorField(res, PG_DIAG_SQLSTATE) : NULL;
+    if (sqlstate && strcmp(sqlstate, "57014") == 0)
+        return DB_TIMEOUT;
+    return DB_ERROR;
+}
 
 typedef struct {
     char **columns;
@@ -87,11 +122,11 @@ typedef struct {
     size_t n_rows;
 } db_result_set_t;
 
-db_result_t execute_sql(PGconn *conn, const char *query, const char **params, int n_params);
-db_result_t execute_select(PGconn *conn, const char *query, const char **params, int n_params, db_result_set_t **out_result);
-void free_result_set(db_result_set_t *rc);
+db_result_t execute_sql(db_t* db, const char* query, const char** params, int n_params);
+db_result_t execute_select(db_t* db, const char* query, const char** params, int n_params, db_result_set_t** out_result);
+void free_result_set(db_result_set_t* rc);
 
-PGresult* db_exec(PGconn* conn, const char* query);
-PGresult* db_exec_params(PGconn* conn, const char* query, int n_params, const char** params);
+PGresult* db_exec(db_t* db, const char* query);
+PGresult* db_exec_params(db_t* db, const char* query, int n_params, const char** params);
 
 #endif

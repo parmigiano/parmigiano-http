@@ -3,6 +3,7 @@
 #include "httpx.h"
 #include "postgres/postgres.h"
 #include "postgres/postgres_group_chats.h"
+#include "postgres/validate.h"
 
 #include <cjson/cJSON.h>
 
@@ -19,6 +20,39 @@ typedef struct
     char* name;
     chttpx_number_array_t chat_ids;
 } group_chats_edit_t;
+
+typedef struct {
+    uint64_t user_uid;
+    char* name;
+    int* chat_ids;
+    size_t chat_count;
+    uint64_t group_id;
+} group_chat_tx_t;
+
+static db_result_t group_chat_create_tx(db_t* db, void* arg)
+{
+    group_chat_tx_t* tx = arg;
+    chat_group_t group = {.user_uid = tx->user_uid, .name = tx->name};
+
+    db_result_t result = db_group_chat_create(db, &group, &tx->group_id);
+    if (result != DB_OK)
+        return result;
+    if (tx->group_id == 0)
+        return DB_ERROR;
+
+    return db_group_chat_add_chats(db, tx->user_uid, tx->group_id, tx->chat_ids, tx->chat_count);
+}
+
+static db_result_t group_chat_edit_tx(db_t* db, void* arg)
+{
+    group_chat_tx_t* tx = arg;
+
+    db_result_t result = db_group_chat_edit_name_by_group_id(db, tx->group_id, tx->user_uid, tx->name);
+    if (result != DB_OK)
+        return result;
+
+    return db_group_chat_edit_chats_by_group_id(db, tx->group_id, tx->user_uid, tx->chat_ids, tx->chat_count);
+}
 
 void group_chats_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
@@ -47,39 +81,19 @@ void group_chats_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res
     }
 
     /* GroupID returned before created group */
-    uint64_t group_id = 0;
+    group_chat_tx_t tx = {
+        .user_uid = ctx->user->user_uid,
+        .name = payload.name,
+        .chat_ids = payload.chat_ids.items,
+        .chat_count = payload.chat_ids.count,
+        .group_id = 0,
+    };
 
-    chat_group_t group = {.user_uid = ctx->user->user_uid, .name = payload.name};
-
-    PGconn* conn = app_context->conn;
-    PGresult* pg_res = NULL;
-
-    /* Begin transation db */
-    pg_res = db_exec(conn, "BEGIN");
-    if (!pg_res || PQresultStatus(pg_res) != PGRES_COMMAND_OK)
-    {
-        PQclear(pg_res);
-        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
+    db_result_t r = db_transaction(app_context->db, group_chat_create_tx, &tx);
+    if (db_reply_result(req, res, r))
         return;
-    }
-    PQclear(pg_res);
 
-    db_result_t r = db_group_chat_create(conn, &group, &group_id);
-    if (r != DB_OK || group_id == 0)
-        goto rollback;
-
-    r = db_group_chat_add_chats(app_context->conn, ctx->user->user_uid, group_id, payload.chat_ids.items, payload.chat_ids.count);
-    if (r != DB_OK)
-        goto rollback;
-
-    pg_res = db_exec(conn, "COMMIT");
-    if (!pg_res || PQresultStatus(pg_res) != PGRES_COMMAND_OK)
-    {
-        PQclear(pg_res);
-        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
-        return;
-    }
-    PQclear(pg_res);
+    uint64_t group_id = tx.group_id;
 
     chttpx_json_t* root = cHTTPX_JsonObject(req);
 	chttpx_json_t* message = cHTTPX_JsonObject(req);
@@ -107,29 +121,6 @@ void group_chats_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res
 	}
 
 	*res = cHTTPX_ResJsonObject(cHTTPX_StatusCreated, root);
-	return;
-
-rollback:
-    pg_res = db_exec(conn, "ROLLBACK");
-    PQclear(pg_res);
-
-    switch (r)
-    {
-    case DB_OK:
-        break;
-
-    case DB_TIMEOUT:
-        *res = cHTTPX_ResError(cHTTPX_StatusConnectionTimedOut, cHTTPX_i18n_t("error.database-connection-timeout", req->language));
-        return;
-
-    case DB_DUPLICATE:
-        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.repeating-data-request", req->language));
-        return;
-
-    case DB_ERROR:
-        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
-        return;
-    }
 }
 
 void group_chats_edit_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
@@ -165,35 +156,17 @@ void group_chats_edit_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         return;
     }
 
-    PGconn* conn = app_context->conn;
-    PGresult* pg_res = NULL;
+    group_chat_tx_t tx = {
+        .user_uid = ctx->user->user_uid,
+        .name = payload.name,
+        .chat_ids = payload.chat_ids.items,
+        .chat_count = payload.chat_ids.count,
+        .group_id = group_id,
+    };
 
-    /* Begin transation db */
-    pg_res = db_exec(conn, "BEGIN");
-    if (!pg_res || PQresultStatus(pg_res) != PGRES_COMMAND_OK)
-    {
-        PQclear(pg_res);
-        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
+    db_result_t r = db_transaction(app_context->db, group_chat_edit_tx, &tx);
+    if (db_reply_result(req, res, r))
         return;
-    }
-    PQclear(pg_res);
-
-    db_result_t r = db_group_chat_edit_name_by_group_id(conn, group_id, ctx->user->user_uid, payload.name);
-    if (r != DB_OK)
-        goto rollback;
-
-    r = db_group_chat_edit_chats_by_group_id(conn, group_id, ctx->user->user_uid, payload.chat_ids.items, payload.chat_ids.count);
-    if (r != DB_OK)
-        goto rollback;
-
-    pg_res = db_exec(conn, "COMMIT");
-    if (!pg_res || PQresultStatus(pg_res) != PGRES_COMMAND_OK)
-    {
-        PQclear(pg_res);
-        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
-        return;
-    }
-    PQclear(pg_res);
 
 	chttpx_json_t* root = cHTTPX_JsonObject(req);
 	chttpx_json_t* message = cHTTPX_JsonObject(req);
@@ -221,29 +194,6 @@ void group_chats_edit_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 	}
 
 	*res = cHTTPX_ResJsonObject(cHTTPX_StatusOK, root);
-	return;
-
-rollback:
-    pg_res = db_exec(conn, "ROLLBACK");
-    PQclear(pg_res);
-
-    switch (r)
-    {
-    case DB_OK:
-        break;
-
-    case DB_TIMEOUT:
-        *res = cHTTPX_ResError(cHTTPX_StatusConnectionTimedOut, cHTTPX_i18n_t("error.database-connection-timeout", req->language));
-        return;
-
-    case DB_DUPLICATE:
-        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.repeating-data-request", req->language));
-        return;
-
-    case DB_ERROR:
-        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
-        return;
-    }
 }
 
 void group_chats_delete_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
@@ -263,25 +213,9 @@ void group_chats_delete_handler_v2(chttpx_request_t* req, chttpx_response_t* res
         return;
     }
 
-    db_result_t db_group_delete = db_group_chat_delete(app_context->conn, ctx->user->user_uid, group_id);
-
-    switch (db_group_delete)
-    {
-    case DB_OK:
-        break;
-
-    case DB_TIMEOUT:
-        *res = cHTTPX_ResError(cHTTPX_StatusConnectionTimedOut, cHTTPX_i18n_t("error.database-connection-timeout", req->language));
+    db_result_t db_group_delete = db_group_chat_delete(app_context->db, ctx->user->user_uid, group_id);
+    if (db_reply_result(req, res, db_group_delete))
         return;
-
-    case DB_DUPLICATE:
-        *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.repeating-data-request", req->language));
-        return;
-
-    case DB_ERROR:
-        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.perform-database-operation", req->language));
-        return;
-    }
 
     *res = cHTTPX_ResNoContent();
 }
