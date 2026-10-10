@@ -227,7 +227,7 @@ static redisContext* acquire_connection(int* slot_index)
     }
 
     struct timespec deadline = acquire_deadline();
-    while (!pool.shutting_down)
+    while (pool.initialized && !pool.shutting_down)
     {
         for (int i = 0; i < pool.max_open; ++i)
         {
