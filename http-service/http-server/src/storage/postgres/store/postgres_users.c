@@ -85,7 +85,8 @@ db_result_t db_user_profile_active_create(db_t* db, user_active_t* user)
     return result;
 }
 
-typedef struct {
+typedef struct
+{
     user_core_t* user_core;
     user_profile_t* user_profile;
     user_profile_access_t* user_profile_access;
@@ -112,7 +113,8 @@ static db_result_t db_user_create_tx(db_t* db, void* arg)
     return db_user_profile_active_create(db, args->user_active);
 }
 
-db_result_t db_user_create(db_t* db, user_core_t* user_core, user_profile_t* user_profile, user_profile_access_t* user_profile_access, user_active_t* user_active)
+db_result_t db_user_create(db_t* db, user_core_t* user_core, user_profile_t* user_profile, user_profile_access_t* user_profile_access,
+                           user_active_t* user_active)
 {
     db_user_create_args_t args = {
         .user_core = user_core,
@@ -500,7 +502,8 @@ db_result_t db_user_core_upd_by_uid(db_t* db, uint64_t user_uid, user_profile_up
     return result;
 }
 
-typedef struct {
+typedef struct
+{
     uint64_t user_uid;
     user_profile_update_t* user;
 } db_user_update_args_t;

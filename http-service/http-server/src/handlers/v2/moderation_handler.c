@@ -17,7 +17,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-typedef struct {
+typedef struct
+{
     char target_type[32];
     uint64_t target_id;
     uint64_t reporter_uid;
@@ -25,9 +26,7 @@ typedef struct {
 
 static bool moderation_target_type_valid(const char* target_type)
 {
-    return target_type &&
-           (strcmp(target_type, MODERATION_TARGET_AVATAR) == 0 ||
-            strcmp(target_type, MODERATION_TARGET_CHAT_MEDIA) == 0);
+    return target_type && (strcmp(target_type, MODERATION_TARGET_AVATAR) == 0 || strcmp(target_type, MODERATION_TARGET_CHAT_MEDIA) == 0);
 }
 
 static void lowercase_ascii(char* text)
@@ -102,8 +101,7 @@ static bool parse_http_task(chttpx_request_t* req, moderation_task_t* task)
     const cJSON* target_id = cJSON_GetObjectItemCaseSensitive(root, "target_id");
 
     bool ok = false;
-    if (cJSON_IsString(target_type) && target_type->valuestring &&
-        strlen(target_type->valuestring) < sizeof(task->target_type) &&
+    if (cJSON_IsString(target_type) && target_type->valuestring && strlen(target_type->valuestring) < sizeof(task->target_type) &&
         parse_u64_json(target_id, &task->target_id))
     {
         snprintf(task->target_type, sizeof(task->target_type), "%s", target_type->valuestring);
@@ -137,10 +135,8 @@ static bool parse_queue_task(const rmq_message_t* message, moderation_task_t* ta
     const cJSON* reporter_uid = cJSON_GetObjectItemCaseSensitive(root, "reporter_uid");
 
     bool ok = false;
-    if (cJSON_IsString(target_type) && target_type->valuestring &&
-        strlen(target_type->valuestring) < sizeof(task->target_type) &&
-        parse_u64_json(target_id, &task->target_id) &&
-        parse_u64_json(reporter_uid, &task->reporter_uid))
+    if (cJSON_IsString(target_type) && target_type->valuestring && strlen(target_type->valuestring) < sizeof(task->target_type) &&
+        parse_u64_json(target_id, &task->target_id) && parse_u64_json(reporter_uid, &task->reporter_uid))
     {
         snprintf(task->target_type, sizeof(task->target_type), "%s", target_type->valuestring);
         lowercase_ascii(task->target_type);
@@ -151,9 +147,7 @@ static bool parse_queue_task(const rmq_message_t* message, moderation_task_t* ta
     return ok;
 }
 
-static rmq_result_t publish_moderation_task(const moderation_task_t* task,
-                                            const char* message_id,
-                                            rmq_error_t* error)
+static rmq_result_t publish_moderation_task(const moderation_task_t* task, const char* message_id, rmq_error_t* error)
 {
     if (!task || !moderation_target_type_valid(task->target_type) || !task->target_id || !task->reporter_uid)
         return RMQ_INVALID_ARGUMENT;
@@ -167,10 +161,8 @@ static rmq_result_t publish_moderation_task(const moderation_task_t* task,
     snprintf(target_id, sizeof(target_id), "%" PRIu64, task->target_id);
     snprintf(reporter_uid, sizeof(reporter_uid), "%" PRIu64, task->reporter_uid);
 
-    if (!cJSON_AddNumberToObject(root, "version", 1) ||
-        !cJSON_AddStringToObject(root, "target_type", task->target_type) ||
-        !cJSON_AddStringToObject(root, "target_id", target_id) ||
-        !cJSON_AddStringToObject(root, "reporter_uid", reporter_uid))
+    if (!cJSON_AddNumberToObject(root, "version", 1) || !cJSON_AddStringToObject(root, "target_type", task->target_type) ||
+        !cJSON_AddStringToObject(root, "target_id", target_id) || !cJSON_AddStringToObject(root, "reporter_uid", reporter_uid))
     {
         cJSON_Delete(root);
         return RMQ_OUT_OF_MEMORY;
@@ -182,13 +174,7 @@ static rmq_result_t publish_moderation_task(const moderation_task_t* task,
     if (!json)
         return RMQ_OUT_OF_MEMORY;
 
-    rmq_result_t result = rabbitmq_publish_json(
-        RABBITMQ_ROUTE_MODERATION,
-        json,
-        strlen(json),
-        message_id,
-        error
-    );
+    rmq_result_t result = rabbitmq_publish_json(RABBITMQ_ROUTE_MODERATION, json, strlen(json), message_id, error);
 
     free(json);
     return result;
@@ -215,8 +201,7 @@ void moderation_wtype_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     rmq_result_t result = publish_moderation_task(&task, req->request_id, &error);
     if (result != RMQ_OK)
     {
-        logger_error("moderation_wtype_handler_v2 req={%s}: RabbitMQ operation=%s error=%s",
-                     req->request_id, error.operation, error.detail);
+        logger_error("moderation_wtype_handler_v2 req={%s}: RabbitMQ operation=%s error=%s", req->request_id, error.operation, error.detail);
 
         uint16_t status = result == RMQ_TIMEOUT ? cHTTPX_StatusGatewayTimeout : cHTTPX_StatusServiceUnavailable;
         *res = cHTTPX_ResError(status, cHTTPX_i18n_t(rmq_result_locale_key(result), req->language));
@@ -241,15 +226,13 @@ rmq_action_t moderation_data_handler_v2(const rmq_message_t* message, void* user
     db_result_t db_result = db_moderation_target_get(app_context->db, task.target_type, task.target_id, &target);
     if (db_result != DB_OK)
     {
-        logger_error("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 "}: target lookup failed",
-                     task.target_type, task.target_id);
+        logger_error("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 "}: target lookup failed", task.target_type, task.target_id);
         return RMQ_REQUEUE;
     }
 
     if (!target)
     {
-        logger_info("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 "}: target no longer exists",
-                    task.target_type, task.target_id);
+        logger_info("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 "}: target no longer exists", task.target_type, task.target_id);
         return RMQ_ACK;
     }
 
@@ -258,32 +241,30 @@ rmq_action_t moderation_data_handler_v2(const rmq_message_t* message, void* user
 
     if (scan == MODERATION_MEDIA_CLEAN)
     {
-        logger_info("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 "}: clean",
-                    target->target_type, target->target_id);
+        logger_info("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 "}: clean", target->target_type, target->target_id);
         db_moderation_target_free(target);
         return RMQ_ACK;
     }
 
     if (scan == MODERATION_MEDIA_NOT_FOUND)
     {
-        logger_warn("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 "}: %s",
-                    target->target_type, target->target_id, detail);
+        logger_warn("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 "}: %s", target->target_type, target->target_id, detail);
         db_moderation_target_free(target);
         return RMQ_ACK;
     }
 
     if (scan == MODERATION_MEDIA_INVALID)
     {
-        logger_warn("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 "}: invalid media: %s",
-                    target->target_type, target->target_id, detail);
+        logger_warn("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 "}: invalid media: %s", target->target_type, target->target_id,
+                    detail);
         db_moderation_target_free(target);
         return RMQ_REJECT;
     }
 
     if (scan == MODERATION_MEDIA_RETRY || scan == MODERATION_MEDIA_ERROR)
     {
-        logger_error("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 "}: scan failed: %s",
-                     target->target_type, target->target_id, detail);
+        logger_error("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 "}: scan failed: %s", target->target_type, target->target_id,
+                     detail);
         db_moderation_target_free(target);
         return RMQ_REQUEUE;
     }
@@ -292,16 +273,16 @@ rmq_action_t moderation_data_handler_v2(const rmq_message_t* message, void* user
     db_result = db_moderation_apply_violation(app_context->db, target, task.reporter_uid, &apply);
     if (db_result != DB_OK)
     {
-        logger_error("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 "}: failed to apply violation",
-                     target->target_type, target->target_id);
+        logger_error("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 "}: failed to apply violation", target->target_type,
+                     target->target_id);
         db_moderation_target_free(target);
         return RMQ_REQUEUE;
     }
 
     if (!apply.applied)
     {
-        logger_info("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 "}: stale or duplicate violation",
-                    target->target_type, target->target_id);
+        logger_info("moderation_data_handler_v2 target_type={%s} target_id={%" PRIu64 "}: stale or duplicate violation", target->target_type,
+                    target->target_id);
         db_moderation_target_free(target);
         return RMQ_ACK;
     }

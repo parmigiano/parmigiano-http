@@ -21,7 +21,8 @@ typedef struct
     chttpx_number_array_t chat_ids;
 } group_chats_edit_t;
 
-typedef struct {
+typedef struct
+{
     uint64_t user_uid;
     char* name;
     int* chat_ids;
@@ -96,31 +97,31 @@ void group_chats_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res
     uint64_t group_id = tx.group_id;
 
     chttpx_json_t* root = cHTTPX_JsonObject(req);
-	chttpx_json_t* message = cHTTPX_JsonObject(req);
-	chttpx_json_t* ids = cHTTPX_JsonArray(req);
+    chttpx_json_t* message = cHTTPX_JsonObject(req);
+    chttpx_json_t* ids = cHTTPX_JsonArray(req);
 
-	if (!root || !message || !ids || cHTTPX_JsonNumber(message, "id", (double)group_id) != 0 || cHTTPX_JsonString(message, "name", payload.name) != 0)
-	{
-		*res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
-		return;
-	}
+    if (!root || !message || !ids || cHTTPX_JsonNumber(message, "id", (double)group_id) != 0 || cHTTPX_JsonString(message, "name", payload.name) != 0)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+        return;
+    }
 
-	for (size_t i = 0; i < payload.chat_ids.count; ++i)
-	{
-		if (cHTTPX_JsonArrayNumber(ids, payload.chat_ids.items[i]) != 0)
-		{
-			*res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
-			return;
-		}
-	}
+    for (size_t i = 0; i < payload.chat_ids.count; ++i)
+    {
+        if (cHTTPX_JsonArrayNumber(ids, payload.chat_ids.items[i]) != 0)
+        {
+            *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+            return;
+        }
+    }
 
-	if (cHTTPX_JsonChild(message, "chat_ids", ids) != 0 || cHTTPX_JsonChild(root, "message", message) != 0)
-	{
-		*res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
-		return;
-	}
+    if (cHTTPX_JsonChild(message, "chat_ids", ids) != 0 || cHTTPX_JsonChild(root, "message", message) != 0)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+        return;
+    }
 
-	*res = cHTTPX_ResJsonObject(cHTTPX_StatusCreated, root);
+    *res = cHTTPX_ResJsonObject(cHTTPX_StatusCreated, root);
 }
 
 void group_chats_edit_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
@@ -168,32 +169,32 @@ void group_chats_edit_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     if (db_reply_result(req, res, r))
         return;
 
-	chttpx_json_t* root = cHTTPX_JsonObject(req);
-	chttpx_json_t* message = cHTTPX_JsonObject(req);
-	chttpx_json_t* ids = cHTTPX_JsonArray(req);
+    chttpx_json_t* root = cHTTPX_JsonObject(req);
+    chttpx_json_t* message = cHTTPX_JsonObject(req);
+    chttpx_json_t* ids = cHTTPX_JsonArray(req);
 
-	if (!root || !message || !ids || cHTTPX_JsonNumber(message, "id", (double)group_id) != 0 || cHTTPX_JsonString(message, "name", payload.name) != 0)
-	{
-		*res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
-		return;
-	}
+    if (!root || !message || !ids || cHTTPX_JsonNumber(message, "id", (double)group_id) != 0 || cHTTPX_JsonString(message, "name", payload.name) != 0)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+        return;
+    }
 
-	for (size_t i = 0; i < payload.chat_ids.count; ++i)
-	{
-		if (cHTTPX_JsonArrayNumber(ids, payload.chat_ids.items[i]) != 0)
-		{
-			*res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
-			return;
-		}
-	}
+    for (size_t i = 0; i < payload.chat_ids.count; ++i)
+    {
+        if (cHTTPX_JsonArrayNumber(ids, payload.chat_ids.items[i]) != 0)
+        {
+            *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+            return;
+        }
+    }
 
-	if (cHTTPX_JsonChild(message, "chat_ids", ids) != 0 || cHTTPX_JsonChild(root, "message", message) != 0)
-	{
-		*res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
-		return;
-	}
+    if (cHTTPX_JsonChild(message, "chat_ids", ids) != 0 || cHTTPX_JsonChild(root, "message", message) != 0)
+    {
+        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+        return;
+    }
 
-	*res = cHTTPX_ResJsonObject(cHTTPX_StatusOK, root);
+    *res = cHTTPX_ResJsonObject(cHTTPX_StatusOK, root);
 }
 
 void group_chats_delete_handler_v2(chttpx_request_t* req, chttpx_response_t* res)

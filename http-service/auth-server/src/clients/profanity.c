@@ -108,7 +108,8 @@ static bool text_is_blank(const char* text)
     return *text == '\0';
 }
 
-static profanity_result_t finish(profanity_error_t* error, profanity_result_t code, long http_status, CURLcode curl_code, int system_errno, const char* detail)
+static profanity_result_t finish(profanity_error_t* error, profanity_result_t code, long http_status, CURLcode curl_code, int system_errno,
+                                 const char* detail)
 {
     if (error)
     {
@@ -439,15 +440,15 @@ profanity_result_t profanity_check(const profanity_client_t* client, const char*
         goto cleanup;
     }
 
-#define PROFANITY_TRY(call)                                                                         \
-    do                                                                                              \
-    {                                                                                               \
-        code = (call);                                                                              \
-        if (code != CURLE_OK)                                                                       \
-        {                                                                                           \
-            result = code == CURLE_OUT_OF_MEMORY ? PROFANITY_OUT_OF_MEMORY : PROFANITY_CLIENT_ERROR; \
-            goto cleanup;                                                                           \
-        }                                                                                           \
+#define PROFANITY_TRY(call)                                                                                                                          \
+    do                                                                                                                                               \
+    {                                                                                                                                                \
+        code = (call);                                                                                                                               \
+        if (code != CURLE_OK)                                                                                                                        \
+        {                                                                                                                                            \
+            result = code == CURLE_OUT_OF_MEMORY ? PROFANITY_OUT_OF_MEMORY : PROFANITY_CLIENT_ERROR;                                                 \
+            goto cleanup;                                                                                                                            \
+        }                                                                                                                                            \
     } while (0)
 
     long timeout_ms = client->timeout_ms ? client->timeout_ms : PROFANITY_DEFAULT_TIMEOUT_MS;

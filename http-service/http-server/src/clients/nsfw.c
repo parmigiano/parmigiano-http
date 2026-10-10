@@ -472,7 +472,7 @@ nsfw_result_t nsfw_check_file(const nsfw_client_t* client, const char* path, con
 
             goto cleanup;
         }
-		
+
         if (!count)
             break;
 

@@ -10,7 +10,7 @@ void http_routes(chttpx_serv_t* server)
     static const char* image_types[] = {cHTTPX_CTYPE_JPEG, cHTTPX_CTYPE_PNG, cHTTPX_CTYPE_GIF};
     static const char* background_types[] = {cHTTPX_CTYPE_JPEG, cHTTPX_CTYPE_PNG};
 
-	/* Policy */
+    /* Policy */
     static const chttpx_upload_policy_t avatar_policy = {
         .max_size = 10 * 1024 * 1024,
         .allowed_types = image_types,
@@ -75,9 +75,9 @@ void http_routes(chttpx_serv_t* server)
 
 void moderation_routes(chttpx_serv_t* server)
 {
-	chttpx_router_t api = cHTTPX_RoutePathPrefix(server, "/api/v2");
+    chttpx_router_t api = cHTTPX_RoutePathPrefix(server, "/api/v2");
 
-	/* Moderation routes */
+    /* Moderation routes */
     chttpx_router_t moderation = cHTTPX_RouteGroup(&api, "/moderation");
     cHTTPX_RouterUse(&moderation, authenticate_middleware);
     cHTTPX_Post(&moderation, "/scan", moderation_wtype_handler_v2);

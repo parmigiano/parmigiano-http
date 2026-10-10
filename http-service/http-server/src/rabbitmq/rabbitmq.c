@@ -57,7 +57,8 @@ const char* rmq_result_locale_key(rmq_result_t result)
     return keys[result];
 }
 
-static rmq_result_t report(rmq_error_t* error, rmq_result_t code, const char* operation, int library_code, int system_errno, uint16_t broker_code, const char* detail)
+static rmq_result_t report(rmq_error_t* error, rmq_result_t code, const char* operation, int library_code, int system_errno, uint16_t broker_code,
+                           const char* detail)
 {
     if (error)
     {

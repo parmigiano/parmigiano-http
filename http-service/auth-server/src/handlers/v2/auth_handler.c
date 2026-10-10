@@ -81,7 +81,8 @@ static void auth_reply_token_status(chttpx_request_t* req, chttpx_response_t* re
 static int auth_reply_next(chttpx_request_t* req, chttpx_response_t* res, const char* next, const char* field, const char* value, int expires_in)
 {
     chttpx_json_t* root = cHTTPX_JsonObject(req);
-    if (!root || cHTTPX_JsonString(root, "next", next) != 0 || cHTTPX_JsonString(root, field, value) != 0 || cHTTPX_JsonNumber(root, "expires_in", expires_in) != 0)
+    if (!root || cHTTPX_JsonString(root, "next", next) != 0 || cHTTPX_JsonString(root, field, value) != 0 ||
+        cHTTPX_JsonNumber(root, "expires_in", expires_in) != 0)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
         return 0;
@@ -257,7 +258,6 @@ cleanup:
 
     if (session_id)
         free(session_id);
-
 }
 
 void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
@@ -495,7 +495,7 @@ void auth_verify_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
         goto cleanup;
     }
-    
+
     if (consumed == 0)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.invalid-confirmation-code", req->language));
@@ -519,7 +519,8 @@ void auth_verify_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 
     if (!user)
     {
-        redis_auth_token_status_t token_status = redis_auth_token_create(REDIS_AUTH_TOKEN_REGISTRATION, payload.email, flow_token, sizeof(flow_token));
+        redis_auth_token_status_t token_status =
+            redis_auth_token_create(REDIS_AUTH_TOKEN_REGISTRATION, payload.email, flow_token, sizeof(flow_token));
         if (token_status != REDIS_AUTH_TOKEN_OK)
         {
             logger_error("auth_verify_handler_v2 req={%s}: failed to create registration token", req->request_id);
@@ -577,7 +578,7 @@ cleanup:
 void auth_delete_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
     auth_token_t* ctx = cHTTPX_ContextGet(req, AUTH_CONTEXT_NAME);
-	if (!ctx || !ctx->user)
+    if (!ctx || !ctx->user)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
         return;

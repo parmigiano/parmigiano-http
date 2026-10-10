@@ -7,7 +7,6 @@
 #include <string.h>
 #include <time.h>
 
-
 #include <openssl/err.h>
 #include <openssl/rand.h>
 #include <openssl/sha.h>
@@ -87,7 +86,8 @@ static int b64url_decode_32(const char* in, unsigned char out[AUTH_TOKEN_RAW_LEN
     size_t o = 0;
     for (size_t i = 0; i < 40; i += 4)
     {
-        unsigned int n = ((unsigned int)vals[i] << 18) | ((unsigned int)vals[i + 1] << 12) | ((unsigned int)vals[i + 2] << 6) | (unsigned int)vals[i + 3];
+        unsigned int n =
+            ((unsigned int)vals[i] << 18) | ((unsigned int)vals[i + 1] << 12) | ((unsigned int)vals[i + 2] << 6) | (unsigned int)vals[i + 3];
         out[o++] = (unsigned char)((n >> 16) & 0xff);
         out[o++] = (unsigned char)((n >> 8) & 0xff);
         out[o++] = (unsigned char)(n & 0xff);
@@ -131,7 +131,8 @@ static const char* other_token_prefix(redis_auth_token_kind_t kind)
     return NULL;
 }
 
-static redis_auth_token_status_t token_keys(redis_auth_token_kind_t kind, const char* token, char* key, size_t key_len, char* other_key, size_t other_key_len)
+static redis_auth_token_status_t token_keys(redis_auth_token_kind_t kind, const char* token, char* key, size_t key_len, char* other_key,
+                                            size_t other_key_len)
 {
     if (!token || token[0] == '\0')
         return REDIS_AUTH_TOKEN_MISSING;

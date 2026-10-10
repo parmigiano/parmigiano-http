@@ -90,7 +90,7 @@ int send_email_async(const char* to, const char* subject, const char* body, cons
 
         if (task->cc)
             free(task->cc);
-        
+
         free(task);
         return 1;
     }

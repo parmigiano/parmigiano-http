@@ -87,16 +87,14 @@ const char* map_mime_to_msg_type(const char* mime)
         return "file";
 
     /* ---------- DOCUMENTS / FILE ---------- */
-    if (mime_equals(mime, "application/pdf") || mime_equals(mime, "application/zip") ||
-        mime_equals(mime, "application/x-zip-compressed") || mime_equals(mime, "application/x-rar-compressed") ||
-        mime_equals(mime, "application/vnd.rar") || mime_equals(mime, "application/x-7z-compressed"))
+    if (mime_equals(mime, "application/pdf") || mime_equals(mime, "application/zip") || mime_equals(mime, "application/x-zip-compressed") ||
+        mime_equals(mime, "application/x-rar-compressed") || mime_equals(mime, "application/vnd.rar") ||
+        mime_equals(mime, "application/x-7z-compressed"))
         return "file";
 
     /* Microsoft Office */
-    if (mime_equals(mime, "application/msword") ||
-        mime_equals(mime, "application/vnd.openxmlformats-officedocument.wordprocessingml.document") ||
-        mime_equals(mime, "application/vnd.ms-excel") ||
-        mime_equals(mime, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") ||
+    if (mime_equals(mime, "application/msword") || mime_equals(mime, "application/vnd.openxmlformats-officedocument.wordprocessingml.document") ||
+        mime_equals(mime, "application/vnd.ms-excel") || mime_equals(mime, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") ||
         mime_equals(mime, "application/vnd.ms-powerpoint") ||
         mime_equals(mime, "application/vnd.openxmlformats-officedocument.presentationml.presentation"))
         return "file";

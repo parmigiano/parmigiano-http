@@ -10,14 +10,16 @@
 #include <string.h>
 #include <time.h>
 
-typedef struct {
+typedef struct
+{
     PGconn* conn;
     int64_t created_ms;
     int64_t idle_since_ms;
     int in_use;
 } db_slot_t;
 
-struct db {
+struct db
+{
     char* host;
     char* port;
     char* dbname;
@@ -40,7 +42,8 @@ struct db {
     int closing;
 };
 
-typedef struct {
+typedef struct
+{
     db_t* db;
     PGconn* conn;
     int slot;
@@ -123,13 +126,7 @@ static PGconn* db_connect_new(db_t* db, db_result_t* out_result)
         "host", "port", "dbname", "user", "password", "connect_timeout", "options", NULL,
     };
     const char* values[] = {
-        db->host,
-        db->port[0] ? db->port : "5432",
-        db->dbname,
-        db->user,
-        db->password,
-        seconds > 0 ? timeout_sec : NULL,
-        options[0] ? options : NULL,
+        db->host, db->port[0] ? db->port : "5432", db->dbname, db->user, db->password, seconds > 0 ? timeout_sec : NULL, options[0] ? options : NULL,
         NULL,
     };
 

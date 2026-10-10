@@ -1,0 +1,6 @@
+172.18.0.1 - - [18/Jul/2026:13:57:21 +0000] "GET /api/v2/doc.api/swagger/gui HTTP/1.1" 200 637 "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0" 18542160.3860ms
+172.18.0.1 - - [18/Jul/2026:13:57:22 +0000] "GET /favicon.ico HTTP/1.1" 404 22 "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0" 18543080.2896ms
+172.18.0.1 - - [18/Jul/2026:13:57:23 +0000] "GET /api/v2/doc.api/swagger/json HTTP/1.1" 200 54870 "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0" 18543645.1445ms
+172.18.0.1 - - [18/Jul/2026:13:57:29 +0000] "GET /api/v2/doc.api/swagger/json HTTP/1.1" 200 54870 "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0" 18549572.1636ms
+172.18.0.1 - - [18/Jul/2026:13:57:35 +0000] "GET /api/v2/doc.api/swagger/gui HTTP/1.1" 200 637 "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0" 18555814.4492ms
+172.18.0.1 - - [18/Jul/2026:13:57:35 +0000] "GET /api/v2/doc.api/swagger/json HTTP/1.1" 200 54870 "Mozilla/5.0 (X11; Linux x86_64; rv:128.0) Gecko/20100101 Firefox/128.0" 18556036.7597ms

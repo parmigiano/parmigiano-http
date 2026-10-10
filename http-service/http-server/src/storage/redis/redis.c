@@ -44,7 +44,7 @@ int redis_conn(void)
     {
         if (redis)
             redisFree(redis);
-        
+
         redis = NULL;
         return 0;
     }

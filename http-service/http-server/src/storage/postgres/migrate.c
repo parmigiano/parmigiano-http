@@ -123,7 +123,9 @@ static void migration_fatal(db_t* db, const char* message)
 
     if (db)
     {
-        PGresult* unlock = db_exec(db, "SELECT pg_advisory_unlock(" "73490127" ")");
+        PGresult* unlock = db_exec(db, "SELECT pg_advisory_unlock("
+                                       "73490127"
+                                       ")");
         if (unlock)
             PQclear(unlock);
     }
@@ -154,7 +156,9 @@ static void run_migrations_body(db_t* db)
     if (!db)
         migration_fatal(db, "database connection is not ready");
 
-    PGresult* res = db_exec(db, "SELECT pg_advisory_lock(" "73490127" ")");
+    PGresult* res = db_exec(db, "SELECT pg_advisory_lock("
+                                "73490127"
+                                ")");
     if (!res || PQresultStatus(res) != PGRES_TUPLES_OK)
     {
         if (res)
@@ -163,13 +167,12 @@ static void run_migrations_body(db_t* db)
     }
     PQclear(res);
 
-    res = db_exec(db,
-        "CREATE TABLE IF NOT EXISTS schema_migrations ("
-        "version INT PRIMARY KEY, "
-        "name TEXT, "
-        "checksum VARCHAR(16), "
-        "applied_at TIMESTAMPTZ NOT NULL DEFAULT now()"
-        ")");
+    res = db_exec(db, "CREATE TABLE IF NOT EXISTS schema_migrations ("
+                      "version INT PRIMARY KEY, "
+                      "name TEXT, "
+                      "checksum VARCHAR(16), "
+                      "applied_at TIMESTAMPTZ NOT NULL DEFAULT now()"
+                      ")");
     if (!command_ok(res))
     {
         if (res)
@@ -275,10 +278,7 @@ static void run_migrations_body(db_t* db)
         snprintf(version_str, sizeof(version_str), "%d", version);
         const char* check_params[1] = {version_str};
 
-        res = db_exec_params(db,
-            "SELECT name, checksum FROM schema_migrations WHERE version = $1::int",
-            1,
-            check_params);
+        res = db_exec_params(db, "SELECT name, checksum FROM schema_migrations WHERE version = $1::int", 1, check_params);
 
         if (!res || PQresultStatus(res) != PGRES_TUPLES_OK)
         {
@@ -302,10 +302,7 @@ static void run_migrations_body(db_t* db)
             if (!stored_checksum)
             {
                 const char* update_params[3] = {files[i], checksum, version_str};
-                res = db_exec_params(db,
-                    "UPDATE schema_migrations SET name = $1, checksum = $2 WHERE version = $3::int",
-                    3,
-                    update_params);
+                res = db_exec_params(db, "UPDATE schema_migrations SET name = $1, checksum = $2 WHERE version = $3::int", 3, update_params);
                 if (!command_ok(res))
                 {
                     free(sql);
@@ -351,10 +348,7 @@ static void run_migrations_body(db_t* db)
         PQclear(res);
 
         const char* insert_params[3] = {version_str, files[i], checksum};
-        res = db_exec_params(db,
-            "INSERT INTO schema_migrations(version, name, checksum) VALUES($1::int, $2, $3)",
-            3,
-            insert_params);
+        res = db_exec_params(db, "INSERT INTO schema_migrations(version, name, checksum) VALUES($1::int, $2, $3)", 3, insert_params);
         if (!command_ok(res))
         {
             if (res)
@@ -381,7 +375,9 @@ static void run_migrations_body(db_t* db)
 
     free(files);
 
-    res = db_exec(db, "SELECT pg_advisory_unlock(" "73490127" ")");
+    res = db_exec(db, "SELECT pg_advisory_unlock("
+                      "73490127"
+                      ")");
     if (res)
         PQclear(res);
 }

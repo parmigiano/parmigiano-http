@@ -13,7 +13,7 @@
 void user_me_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
     auth_token_t* ctx = cHTTPX_ContextGet(req, AUTH_CONTEXT_NAME);
-	if (!ctx || !ctx->user)
+    if (!ctx || !ctx->user)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
         return;
@@ -24,18 +24,13 @@ void user_me_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 
     if (!root || !message || cHTTPX_JsonNumber(message, "id", (double)ctx->user->id) != 0 ||
         cHTTPX_JsonNumber(message, "created_at", (double)ctx->user->created_at) != 0 ||
-        cHTTPX_JsonNumber(message, "user_uid", (double)ctx->user->user_uid) != 0 ||
-        cHTTPX_JsonString(message, "avatar", ctx->user->avatar) != 0 ||
-        cHTTPX_JsonString(message, "name", ctx->user->name) != 0 ||
-        cHTTPX_JsonString(message, "username", ctx->user->username) != 0 ||
+        cHTTPX_JsonNumber(message, "user_uid", (double)ctx->user->user_uid) != 0 || cHTTPX_JsonString(message, "avatar", ctx->user->avatar) != 0 ||
+        cHTTPX_JsonString(message, "name", ctx->user->name) != 0 || cHTTPX_JsonString(message, "username", ctx->user->username) != 0 ||
         cHTTPX_JsonBool(message, "username_visible", ctx->user->username_visible) != 0 ||
-        cHTTPX_JsonString(message, "email", ctx->user->email) != 0 ||
-        cHTTPX_JsonBool(message, "email_visible", ctx->user->email_visible) != 0 ||
-        cHTTPX_JsonBool(message, "email_confirm", ctx->user->email_confirm) != 0 ||
-        cHTTPX_JsonString(message, "phone", ctx->user->phone) != 0 ||
+        cHTTPX_JsonString(message, "email", ctx->user->email) != 0 || cHTTPX_JsonBool(message, "email_visible", ctx->user->email_visible) != 0 ||
+        cHTTPX_JsonBool(message, "email_confirm", ctx->user->email_confirm) != 0 || cHTTPX_JsonString(message, "phone", ctx->user->phone) != 0 ||
         cHTTPX_JsonBool(message, "phone_visible", ctx->user->phone_visible) != 0 ||
-        cHTTPX_JsonString(message, "overview", ctx->user->overview) != 0 ||
-        cHTTPX_JsonChild(root, "message", message) != 0)
+        cHTTPX_JsonString(message, "overview", ctx->user->overview) != 0 || cHTTPX_JsonChild(root, "message", message) != 0)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
         return;
@@ -47,7 +42,7 @@ void user_me_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 void user_upload_avatar_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 {
     auth_token_t* ctx = cHTTPX_ContextGet(req, AUTH_CONTEXT_NAME);
-	if (!ctx || !ctx->user)
+    if (!ctx || !ctx->user)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
         return;
@@ -214,18 +209,12 @@ void user_get_profile_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 
     if (!root || !message || cHTTPX_JsonNumber(message, "id", (double)user->id) != 0 ||
         cHTTPX_JsonNumber(message, "created_at", (double)user->created_at) != 0 ||
-        cHTTPX_JsonNumber(message, "user_uid", (double)user->user_uid) != 0 ||
-        cHTTPX_JsonString(message, "avatar", user->avatar) != 0 ||
-        cHTTPX_JsonString(message, "name", user->name) != 0 ||
-        cHTTPX_JsonString(message, "username", user->username) != 0 ||
-        cHTTPX_JsonBool(message, "username_visible", user->username_visible) != 0 ||
-        cHTTPX_JsonString(message, "email", user->email) != 0 ||
-        cHTTPX_JsonBool(message, "email_visible", user->email_visible) != 0 ||
-        cHTTPX_JsonBool(message, "email_confirm", user->email_confirm) != 0 ||
-        cHTTPX_JsonString(message, "phone", user->phone) != 0 ||
-        cHTTPX_JsonBool(message, "phone_visible", user->phone_visible) != 0 ||
-        cHTTPX_JsonString(message, "overview", user->overview) != 0 ||
-        cHTTPX_JsonChild(root, "message", message) != 0)
+        cHTTPX_JsonNumber(message, "user_uid", (double)user->user_uid) != 0 || cHTTPX_JsonString(message, "avatar", user->avatar) != 0 ||
+        cHTTPX_JsonString(message, "name", user->name) != 0 || cHTTPX_JsonString(message, "username", user->username) != 0 ||
+        cHTTPX_JsonBool(message, "username_visible", user->username_visible) != 0 || cHTTPX_JsonString(message, "email", user->email) != 0 ||
+        cHTTPX_JsonBool(message, "email_visible", user->email_visible) != 0 || cHTTPX_JsonBool(message, "email_confirm", user->email_confirm) != 0 ||
+        cHTTPX_JsonString(message, "phone", user->phone) != 0 || cHTTPX_JsonBool(message, "phone_visible", user->phone_visible) != 0 ||
+        cHTTPX_JsonString(message, "overview", user->overview) != 0 || cHTTPX_JsonChild(root, "message", message) != 0)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
         goto cleanup;
@@ -304,5 +293,4 @@ cleanup:
     free(password_hash);
 
     return;
-
 }

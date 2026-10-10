@@ -12,7 +12,7 @@
 #include <curl/curl.h>
 #include <libchttpx/libchttpx.h>
 
-app_context_t *app_context = NULL;
+app_context_t* app_context = NULL;
 
 static void _cors(chttpx_serv_t* server);
 static void _http_cleanup(void);
@@ -22,7 +22,7 @@ void http_init(void)
     /* Initial logger */
     logger_init();
 
-	app_context = (app_context_t*)calloc(1, sizeof(app_context_t));
+    app_context = (app_context_t*)calloc(1, sizeof(app_context_t));
     if (!app_context)
     {
         logger_error("http_init: calloc failed for app_context");
@@ -30,48 +30,49 @@ void http_init(void)
         return;
     }
 
-	chttpx_error_t app_result = cHTTPX_AppInit(&app_context->app);
-	if (app_result != CHTTPX_OK)
-	{
-		logger_error("http_init: failed to initialize cHTTPX App, error=%d", app_result);
-		fprintf(stderr, "failed to initialize libchttpx app, error=%d\n", app_result);
+    chttpx_error_t app_result = cHTTPX_AppInit(&app_context->app);
+    if (app_result != CHTTPX_OK)
+    {
+        logger_error("http_init: failed to initialize cHTTPX App, error=%d", app_result);
+        fprintf(stderr, "failed to initialize libchttpx app, error=%d\n", app_result);
 
-		_http_cleanup();
-		return;
-	}
-	app_context->app_initialized = true;
+        _http_cleanup();
+        return;
+    }
+    app_context->app_initialized = true;
 
-	/* Initial HTTP server / Config */
-	static const char* languages[] = {
-		"en", "ru",
-	};
+    /* Initial HTTP server / Config */
+    static const char* languages[] = {
+        "en",
+        "ru",
+    };
 
-	chttpx_config_t http_config = cHTTPX_DefaultConfig();
-	http_config.port = HTTPX_SERVER_PORT;
-	http_config.max_clients = 8192;
-	http_config.read_timeout_sec = 60;
-	http_config.write_timeout_sec = 60;
-	http_config.idle_timeout_sec = 90;
-	http_config.max_header_size = 16 * 1024;
-	http_config.max_body_size = 10 * 1024 * 1024;
-	http_config.max_upload_size = 10 * 1024 * 1024;
-	http_config.request_id_enabled = true;
-	http_config.languages = languages;
-	http_config.languages_count = CHTTPX_ARRAY_LEN(languages);
-	http_config.default_language = "en";
-	http_config.log_level = CHTTPX_LOG_INFO;
-	http_config.logger = logger_httpx;
+    chttpx_config_t http_config = cHTTPX_DefaultConfig();
+    http_config.port = HTTPX_SERVER_PORT;
+    http_config.max_clients = 8192;
+    http_config.read_timeout_sec = 60;
+    http_config.write_timeout_sec = 60;
+    http_config.idle_timeout_sec = 90;
+    http_config.max_header_size = 16 * 1024;
+    http_config.max_body_size = 10 * 1024 * 1024;
+    http_config.max_upload_size = 10 * 1024 * 1024;
+    http_config.request_id_enabled = true;
+    http_config.languages = languages;
+    http_config.languages_count = CHTTPX_ARRAY_LEN(languages);
+    http_config.default_language = "en";
+    http_config.log_level = CHTTPX_LOG_INFO;
+    http_config.logger = logger_httpx;
 
-	app_context->http = cHTTPX_AppServer(&app_context->app, "auth", &http_config);
-	if (!app_context->http)
-	{
-		logger_error("http_init: failed to create auth server");
-		fprintf(stderr, "failed to create auth server\n");
+    app_context->http = cHTTPX_AppServer(&app_context->app, "auth", &http_config);
+    if (!app_context->http)
+    {
+        logger_error("http_init: failed to create auth server");
+        fprintf(stderr, "failed to create auth server\n");
 
-		_http_cleanup();
-		return;
-	}
-	logger_info("Auth server created on port %d", HTTPX_SERVER_PORT);
+        _http_cleanup();
+        return;
+    }
+    logger_info("Auth server created on port %d", HTTPX_SERVER_PORT);
 
     /* Initial redis connect */
     if (!redis_conn())
@@ -79,8 +80,8 @@ void http_init(void)
         logger_error("http_init: failed to start redis error");
         fprintf(stderr, "redis error\n");
 
-		_http_cleanup();
-		return;
+        _http_cleanup();
+        return;
     }
 
     /* Database connection (migrations are owned by http-server) */
@@ -90,8 +91,8 @@ void http_init(void)
         logger_error("http_init: failed to connect to database");
         fprintf(stderr, "failed to connect to database\n");
 
-		_http_cleanup();
-		return;
+        _http_cleanup();
+        return;
     }
 
     /* Load in memory GeoIP */
@@ -101,8 +102,8 @@ void http_init(void)
         logger_error("http_init: failed load GeoIP in memory: %s", MMDB_strerror(status));
         fprintf(stderr, "failed load GeoIP in memory: %s\n", MMDB_strerror(status));
 
-		_http_cleanup();
-		return;
+        _http_cleanup();
+        return;
     }
 
     /* Cors */
@@ -117,41 +118,41 @@ void http_init(void)
     http_routes(app_context->http);
 
     int run_result = cHTTPX_AppRun(&app_context->app);
-	if (run_result != CHTTPX_OK)
-	{
-		logger_error("http_init: cHTTPX_AppRun failed, error=%d", run_result);
-	}
+    if (run_result != CHTTPX_OK)
+    {
+        logger_error("http_init: cHTTPX_AppRun failed, error=%d", run_result);
+    }
 
-	_http_cleanup();
+    _http_cleanup();
 }
 
 static void _http_cleanup(void)
 {
-	if (!app_context)
-		return;
+    if (!app_context)
+        return;
 
-	if (app_context->app_initialized)
-	{
-		cHTTPX_AppShutdown(&app_context->app);
+    if (app_context->app_initialized)
+    {
+        cHTTPX_AppShutdown(&app_context->app);
 
-		app_context->app_initialized = false;
-		app_context->http = NULL;
-	}
+        app_context->app_initialized = false;
+        app_context->http = NULL;
+    }
 
-	/* Free mmdb GeoIP */
+    /* Free mmdb GeoIP */
     MMDB_close(&app_context->geoip);
 
-	/* PostgreSQL */
-	if (app_context->db)
+    /* PostgreSQL */
+    if (app_context->db)
     {
         db_close(app_context->db);
         app_context->db = NULL;
     }
 
-	/* Redis */
-	redis_disconnect();
+    /* Redis */
+    redis_disconnect();
 
-	/* Free CURL */
+    /* Free CURL */
     curl_global_cleanup();
 
     free(app_context);
@@ -160,7 +161,7 @@ static void _http_cleanup(void)
 
 static void _cors(chttpx_serv_t* server)
 {
-	if (!server)
+    if (!server)
         return;
 
     const char* env_type = getenv("TYPE");

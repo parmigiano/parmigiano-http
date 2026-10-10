@@ -1,0 +1,16 @@
+[08.04.2026 17:19:36] [INFO] Successfully connected to the redis!
+[08.04.2026 17:19:36] [INFO] Successfully connected to the database!
+[08.04.2026 17:26:33] [INFO] Successfully connected to the redis!
+[08.04.2026 17:26:33] [INFO] Successfully connected to the database!
+[08.04.2026 17:27:40] [INFO] auth_confirm_email_handler_v2 req={e0d5e966-72c0-445b-a345-273600ea8648}: email={artemvlasiv1909@gmail.com} code={228911}
+[08.04.2026 17:32:52] [INFO] Successfully connected to the redis!
+[08.04.2026 17:32:52] [INFO] Successfully connected to the database!
+[08.04.2026 17:36:48] [INFO] Successfully connected to the redis!
+[08.04.2026 17:36:48] [INFO] Successfully connected to the database!
+[08.04.2026 17:40:40] [INFO] Successfully connected to the redis!
+[08.04.2026 17:40:40] [INFO] Successfully connected to the database!
+[08.04.2026 17:47:40] [INFO] Successfully connected to the redis!
+[08.04.2026 17:47:41] [INFO] Successfully connected to the database!
+[08.04.2026 18:45:10] [INFO] Successfully connected to the redis!
+[08.04.2026 18:45:10] [INFO] Successfully connected to the database!
+[08.04.2026 18:46:05] [INFO] auth_confirm_email_handler_v2 req={db39be5b-54dc-4c09-af08-1638ebea4081}: email={artemvlasiv1909@gmail.com} code={446273}
