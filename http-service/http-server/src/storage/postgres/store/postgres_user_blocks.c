@@ -14,14 +14,13 @@ db_result_t db_user_block_get_active(db_t* db, uint64_t user_uid, user_block_t**
     *out_block = NULL;
     db_result_set_t* rc = NULL;
 
-    const char* query =
-        "SELECT id, user_uid, created_at, blocked_until, reason, blocked_by_uid "
-        "FROM user_blocks "
-        "WHERE user_uid = $1 "
-        "  AND revoked_at IS NULL "
-        "  AND (blocked_until IS NULL OR blocked_until > now()) "
-        "ORDER BY created_at DESC "
-        "LIMIT 1";
+    const char* query = "SELECT id, user_uid, created_at, blocked_until, reason, blocked_by_uid "
+                        "FROM user_blocks "
+                        "WHERE user_uid = $1 "
+                        "  AND revoked_at IS NULL "
+                        "  AND (blocked_until IS NULL OR blocked_until > now()) "
+                        "ORDER BY created_at DESC "
+                        "LIMIT 1";
 
     char user_uid_str[32];
     snprintf(user_uid_str, sizeof(user_uid_str), "%lu", user_uid);
@@ -61,19 +60,14 @@ db_result_t db_user_block_get_active(db_t* db, uint64_t user_uid, user_block_t**
     return DB_OK;
 }
 
-db_result_t db_user_block_create(db_t* db,
-                                 uint64_t user_uid,
-                                 time_t blocked_until,
-                                 const char* reason,
-                                 uint64_t blocked_by_uid)
+db_result_t db_user_block_create(db_t* db, uint64_t user_uid, time_t blocked_until, const char* reason, uint64_t blocked_by_uid)
 {
     if (!db || !user_uid || !reason || !*reason)
         return DB_ERROR;
 
-    const char* query =
-        "INSERT INTO user_blocks (user_uid, blocked_until, reason, blocked_by_uid) "
-        "VALUES ($1, CASE WHEN $2 = '' THEN NULL ELSE to_timestamp($2::bigint) END, $3, "
-        "        CASE WHEN $4 = '0' THEN NULL ELSE $4::bigint END)";
+    const char* query = "INSERT INTO user_blocks (user_uid, blocked_until, reason, blocked_by_uid) "
+                        "VALUES ($1, CASE WHEN $2 = '' THEN NULL ELSE to_timestamp($2::bigint) END, $3, "
+                        "        CASE WHEN $4 = '0' THEN NULL ELSE $4::bigint END)";
 
     char user_uid_str[32];
     char blocked_until_str[32] = {0};
@@ -88,22 +82,18 @@ db_result_t db_user_block_create(db_t* db,
     return execute_sql(db, query, params, 4);
 }
 
-db_result_t db_user_block_revoke_active(db_t* db,
-                                        uint64_t user_uid,
-                                        uint64_t revoked_by_uid,
-                                        const char* revoke_reason)
+db_result_t db_user_block_revoke_active(db_t* db, uint64_t user_uid, uint64_t revoked_by_uid, const char* revoke_reason)
 {
     if (!db || !user_uid)
         return DB_ERROR;
 
-    const char* query =
-        "UPDATE user_blocks "
-        "SET revoked_at = now(), "
-        "    revoked_by_uid = CASE WHEN $2 = '0' THEN NULL ELSE $2::bigint END, "
-        "    revoke_reason = NULLIF($3, '') "
-        "WHERE user_uid = $1 "
-        "  AND revoked_at IS NULL "
-        "  AND (blocked_until IS NULL OR blocked_until > now())";
+    const char* query = "UPDATE user_blocks "
+                        "SET revoked_at = now(), "
+                        "    revoked_by_uid = CASE WHEN $2 = '0' THEN NULL ELSE $2::bigint END, "
+                        "    revoke_reason = NULLIF($3, '') "
+                        "WHERE user_uid = $1 "
+                        "  AND revoked_at IS NULL "
+                        "  AND (blocked_until IS NULL OR blocked_until > now())";
 
     char user_uid_str[32];
     char revoked_by_uid_str[32];

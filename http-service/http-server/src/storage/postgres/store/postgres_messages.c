@@ -84,7 +84,8 @@ db_result_t db_message_create_status(db_t* db, uint64_t message_id, uint64_t cha
     return result;
 }
 
-typedef struct {
+typedef struct
+{
     message_t* msg;
     uint64_t message_id;
 } db_message_create_all_args_t;
@@ -92,7 +93,7 @@ typedef struct {
 static db_result_t db_message_create_all_tx(db_t* db, void* arg)
 {
     db_message_create_all_args_t* args = arg;
-    
+
     db_result_t rc = db_message_create(db, args->msg, &args->message_id);
     if (rc != DB_OK)
         return rc;

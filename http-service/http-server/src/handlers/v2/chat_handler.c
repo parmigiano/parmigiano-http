@@ -37,18 +37,14 @@ static chttpx_response_t chat_preview_response(chttpx_request_t* req, const chat
             const chat_preview_t* chat = &chats->items[i];
             chttpx_json_t* item = cHTTPX_JsonObject(req);
 
-            if (!item || cHTTPX_JsonNumber(item, "id", (double)chat->id) != 0 ||
-                cHTTPX_JsonString(item, "name", chat->name) != 0 ||
-                cHTTPX_JsonString(item, "username", chat->username) != 0 ||
-                cHTTPX_JsonString(item, "avatar", chat->avatar) != 0 ||
+            if (!item || cHTTPX_JsonNumber(item, "id", (double)chat->id) != 0 || cHTTPX_JsonString(item, "name", chat->name) != 0 ||
+                cHTTPX_JsonString(item, "username", chat->username) != 0 || cHTTPX_JsonString(item, "avatar", chat->avatar) != 0 ||
                 cHTTPX_JsonNumber(item, "user_uid", (double)chat->user_uid) != 0 ||
                 cHTTPX_JsonString(item, "last_message", chat->last_message) != 0 ||
                 cHTTPX_JsonNumber(item, "last_message_date", (double)chat->last_message_date) != 0 ||
-                cHTTPX_JsonNumber(item, "unread_message_count", chat->unread_message_count) != 0 ||
-                cHTTPX_JsonArrayChild(message, item) != 0)
+                cHTTPX_JsonNumber(item, "unread_message_count", chat->unread_message_count) != 0 || cHTTPX_JsonArrayChild(message, item) != 0)
             {
-                return cHTTPX_ResError(cHTTPX_StatusInternalServerError,
-                                       cHTTPX_i18n_t("error.something-went-wrong", req->language));
+                return cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
             }
         }
     }
@@ -70,11 +66,9 @@ static chttpx_response_t chat_setting_response(chttpx_request_t* req, const chat
         cHTTPX_JsonNumber(message, "chat_id", (double)setting->chat_id) != 0 ||
         cHTTPX_JsonString(message, "custom_background", setting->custom_background) != 0 ||
         cHTTPX_JsonBool(message, "blocked", setting->blocked) != 0 ||
-        cHTTPX_JsonNumber(message, "who_blocked_uid", (double)setting->who_blocked_uid) != 0 ||
-        cHTTPX_JsonChild(root, "message", message) != 0)
+        cHTTPX_JsonNumber(message, "who_blocked_uid", (double)setting->who_blocked_uid) != 0 || cHTTPX_JsonChild(root, "message", message) != 0)
     {
-        return cHTTPX_ResError(cHTTPX_StatusInternalServerError,
-                               cHTTPX_i18n_t("error.something-went-wrong", req->language));
+        return cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
     }
 
     return cHTTPX_ResJsonObject(cHTTPX_StatusOK, root);

@@ -8,9 +8,7 @@
 
 static bool moderation_target_type_valid(const char* target_type)
 {
-    return target_type &&
-           (strcmp(target_type, MODERATION_TARGET_AVATAR) == 0 ||
-            strcmp(target_type, MODERATION_TARGET_CHAT_MEDIA) == 0);
+    return target_type && (strcmp(target_type, MODERATION_TARGET_AVATAR) == 0 || strcmp(target_type, MODERATION_TARGET_CHAT_MEDIA) == 0);
 }
 
 void db_moderation_target_free(moderation_target_t* target)
@@ -24,10 +22,7 @@ void db_moderation_target_free(moderation_target_t* target)
     free(target);
 }
 
-db_result_t db_moderation_target_get(db_t* db,
-                                      const char* target_type,
-                                      uint64_t target_id,
-                                      moderation_target_t** out_target)
+db_result_t db_moderation_target_get(db_t* db, const char* target_type, uint64_t target_id, moderation_target_t** out_target)
 {
     if (!db || !out_target || !moderation_target_type_valid(target_type) || target_id == 0)
         return DB_ERROR;
@@ -65,8 +60,7 @@ db_result_t db_moderation_target_get(db_t* db,
 
     if (PQresultStatus(result) != PGRES_TUPLES_OK)
     {
-        logger_error("db_moderation_target_get target_type={%s} target_id={%" PRIu64 "}: %s",
-                     target_type, target_id, PQresultErrorMessage(result));
+        logger_error("db_moderation_target_get target_type={%s} target_id={%" PRIu64 "}: %s", target_type, target_id, PQresultErrorMessage(result));
         db_result_t fatal = db_fatal_result(result);
         PQclear(result);
         return fatal;
@@ -110,77 +104,72 @@ db_result_t db_moderation_target_get(db_t* db,
 
 static const char* moderation_apply_query(void)
 {
-    return
-        "WITH removed_avatar AS ("
-        "  UPDATE user_profiles "
-        "  SET avatar = NULL "
-        "  WHERE $4 = 'avatar' "
-        "    AND user_uid = $1::bigint "
-        "    AND avatar = $2 "
-        "  RETURNING user_uid"
-        "), removed_message AS ("
-        "  UPDATE messages "
-        "  SET is_deleted = TRUE, deleted_at = now(), content = '', attachments = NULL "
-        "  WHERE $4 = 'chat_media' "
-        "    AND id = $5::bigint "
-        "    AND sender_uid = $1::bigint "
-        "    AND content = $2 "
-        "    AND is_deleted = FALSE "
-        "  RETURNING sender_uid AS user_uid"
-        "), removed AS ("
-        "  SELECT user_uid FROM removed_avatar "
-        "  UNION ALL "
-        "  SELECT user_uid FROM removed_message"
-        "), reporter AS ("
-        "  SELECT user_uid "
-        "  FROM user_cores "
-        "  WHERE user_uid = NULLIF($3, '')::bigint"
-        "), inserted AS ("
-        "  INSERT INTO moderation_violations "
-        "      (user_uid, reporter_uid, target_type, target_id, content_fingerprint, content_ref, detector) "
-        "  SELECT r.user_uid, (SELECT user_uid FROM reporter), $4, $5::bigint, md5($2), $2, 'nsfw' "
-        "  FROM removed r "
-        "  ON CONFLICT (target_type, target_id, content_fingerprint) DO NOTHING "
-        "  RETURNING user_uid"
-        "), stats AS ("
-        "  INSERT INTO moderation_user_stats (user_uid, violation_count, updated_at) "
-        "  SELECT user_uid, 1, now() FROM inserted "
-        "  ON CONFLICT (user_uid) DO UPDATE "
-        "  SET violation_count = moderation_user_stats.violation_count + 1, "
-        "      updated_at = now() "
-        "  RETURNING user_uid, violation_count AS offense_count"
-        "), blocked AS ("
-        "  INSERT INTO user_blocks (user_uid, blocked_until, reason, blocked_by_uid, metadata) "
-        "  SELECT s.user_uid, "
-        "         CASE s.offense_count "
-        "           WHEN 1 THEN now() + interval '1 hour' "
-        "           WHEN 2 THEN now() + interval '24 hours' "
-        "           WHEN 3 THEN now() + interval '7 days' "
-        "           WHEN 4 THEN now() + interval '30 days' "
-        "           ELSE NULL "
-        "         END, "
-        "         'automatic moderation: prohibited media', NULL, "
-        "         jsonb_build_object('source', 'nsfw', 'target_type', $4, "
-        "                            'target_id', $5::bigint, 'offense_count', s.offense_count, "
-        "                            'penalty_seconds', CASE s.offense_count "
-        "                                WHEN 1 THEN 3600 WHEN 2 THEN 86400 "
-        "                                WHEN 3 THEN 604800 WHEN 4 THEN 2592000 ELSE NULL END) "
-        "  FROM stats s "
-        "  RETURNING user_uid, blocked_until"
-        ") "
-        "SELECT s.offense_count::text, "
-        "       COALESCE(EXTRACT(EPOCH FROM b.blocked_until)::bigint, 0)::text "
-        "FROM stats s JOIN blocked b USING (user_uid)";
+    return "WITH removed_avatar AS ("
+           "  UPDATE user_profiles "
+           "  SET avatar = NULL "
+           "  WHERE $4 = 'avatar' "
+           "    AND user_uid = $1::bigint "
+           "    AND avatar = $2 "
+           "  RETURNING user_uid"
+           "), removed_message AS ("
+           "  UPDATE messages "
+           "  SET is_deleted = TRUE, deleted_at = now(), content = '', attachments = NULL "
+           "  WHERE $4 = 'chat_media' "
+           "    AND id = $5::bigint "
+           "    AND sender_uid = $1::bigint "
+           "    AND content = $2 "
+           "    AND is_deleted = FALSE "
+           "  RETURNING sender_uid AS user_uid"
+           "), removed AS ("
+           "  SELECT user_uid FROM removed_avatar "
+           "  UNION ALL "
+           "  SELECT user_uid FROM removed_message"
+           "), reporter AS ("
+           "  SELECT user_uid "
+           "  FROM user_cores "
+           "  WHERE user_uid = NULLIF($3, '')::bigint"
+           "), inserted AS ("
+           "  INSERT INTO moderation_violations "
+           "      (user_uid, reporter_uid, target_type, target_id, content_fingerprint, content_ref, detector) "
+           "  SELECT r.user_uid, (SELECT user_uid FROM reporter), $4, $5::bigint, md5($2), $2, 'nsfw' "
+           "  FROM removed r "
+           "  ON CONFLICT (target_type, target_id, content_fingerprint) DO NOTHING "
+           "  RETURNING user_uid"
+           "), stats AS ("
+           "  INSERT INTO moderation_user_stats (user_uid, violation_count, updated_at) "
+           "  SELECT user_uid, 1, now() FROM inserted "
+           "  ON CONFLICT (user_uid) DO UPDATE "
+           "  SET violation_count = moderation_user_stats.violation_count + 1, "
+           "      updated_at = now() "
+           "  RETURNING user_uid, violation_count AS offense_count"
+           "), blocked AS ("
+           "  INSERT INTO user_blocks (user_uid, blocked_until, reason, blocked_by_uid, metadata) "
+           "  SELECT s.user_uid, "
+           "         CASE s.offense_count "
+           "           WHEN 1 THEN now() + interval '1 hour' "
+           "           WHEN 2 THEN now() + interval '24 hours' "
+           "           WHEN 3 THEN now() + interval '7 days' "
+           "           WHEN 4 THEN now() + interval '30 days' "
+           "           ELSE NULL "
+           "         END, "
+           "         'automatic moderation: prohibited media', NULL, "
+           "         jsonb_build_object('source', 'nsfw', 'target_type', $4, "
+           "                            'target_id', $5::bigint, 'offense_count', s.offense_count, "
+           "                            'penalty_seconds', CASE s.offense_count "
+           "                                WHEN 1 THEN 3600 WHEN 2 THEN 86400 "
+           "                                WHEN 3 THEN 604800 WHEN 4 THEN 2592000 ELSE NULL END) "
+           "  FROM stats s "
+           "  RETURNING user_uid, blocked_until"
+           ") "
+           "SELECT s.offense_count::text, "
+           "       COALESCE(EXTRACT(EPOCH FROM b.blocked_until)::bigint, 0)::text "
+           "FROM stats s JOIN blocked b USING (user_uid)";
 }
 
-db_result_t db_moderation_apply_violation(db_t* db,
-                                           const moderation_target_t* target,
-                                           uint64_t reporter_uid,
-                                           moderation_apply_result_t* out_result)
+db_result_t db_moderation_apply_violation(db_t* db, const moderation_target_t* target, uint64_t reporter_uid, moderation_apply_result_t* out_result)
 {
-    if (!db || !target || !out_result || !target->content_ref ||
-        !moderation_target_type_valid(target->target_type) ||
-        !target->user_uid || !target->target_id)
+    if (!db || !target || !out_result || !target->content_ref || !moderation_target_type_valid(target->target_type) || !target->user_uid ||
+        !target->target_id)
         return DB_ERROR;
 
     memset(out_result, 0, sizeof(*out_result));
@@ -195,11 +184,7 @@ db_result_t db_moderation_apply_violation(db_t* db,
     snprintf(target_id_str, sizeof(target_id_str), "%" PRIu64, target->target_id);
 
     const char* params[5] = {
-        user_uid_str,
-        target->content_ref,
-        reporter_uid_str,
-        target->target_type,
-        target_id_str,
+        user_uid_str, target->content_ref, reporter_uid_str, target->target_type, target_id_str,
     };
 
     PGresult* result = db_exec_params(db, moderation_apply_query(), 5, params);
@@ -208,8 +193,8 @@ db_result_t db_moderation_apply_violation(db_t* db,
 
     if (PQresultStatus(result) != PGRES_TUPLES_OK)
     {
-        logger_error("db_moderation_apply_violation target_type={%s} target_id={%" PRIu64 "}: %s",
-                     target->target_type, target->target_id, PQresultErrorMessage(result));
+        logger_error("db_moderation_apply_violation target_type={%s} target_id={%" PRIu64 "}: %s", target->target_type, target->target_id,
+                     PQresultErrorMessage(result));
         db_result_t fatal = db_fatal_result(result);
         PQclear(result);
         return fatal;

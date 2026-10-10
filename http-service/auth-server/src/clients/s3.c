@@ -87,8 +87,8 @@ static void response_complete_cb(S3Status status, const S3ErrorDetails* error, v
 
 static bool config_valid(const s3_config_t* cfg)
 {
-    return cfg && cfg->endpoint && *cfg->endpoint && cfg->bucket && *cfg->bucket && cfg->access_key && *cfg->access_key &&
-           cfg->secret_key && *cfg->secret_key;
+    return cfg && cfg->endpoint && *cfg->endpoint && cfg->bucket && *cfg->bucket && cfg->access_key && *cfg->access_key && cfg->secret_key &&
+           *cfg->secret_key;
 }
 
 static S3BucketContext make_bucket_ctx(s3_config_t* cfg)

@@ -79,7 +79,7 @@ char* redis_session_create(const session_t* sess)
     if (r->integer == 1)
     {
         freeReplyObject(r);
-        
+
         r = redis_command("EXPIRE %s %d", key, REDIS_SESSION_TTL);
         if (r)
             freeReplyObject(r);

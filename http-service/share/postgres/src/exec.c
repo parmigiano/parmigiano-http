@@ -124,7 +124,7 @@ db_result_t execute_select(db_t* db, const char* query, const char** params, int
     }
 
     int discard = 0;
-    
+
     PGresult* result = run_params(db, query, n_params, params, &discard);
     if (!result)
         return db_last_result() == DB_OK ? DB_ERROR : db_last_result();

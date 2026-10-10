@@ -13,7 +13,7 @@ bool bind_json_i18n(chttpx_request_t* req, chttpx_response_t* res, chttpx_valida
 
     const char* field = req->error_field[0] ? req->error_field : "";
     const char* lang = req->language;
-    
+
     char msg[sizeof(req->error_msg)];
     const char* out = msg;
 

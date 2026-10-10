@@ -11,7 +11,8 @@
 #include <string.h>
 #include <time.h>
 
-typedef struct {
+typedef struct
+{
     pthread_t thread;
     bool started;
 
@@ -22,7 +23,8 @@ typedef struct {
     rmq_action_t last_action;
 } rabbitmq_worker_t;
 
-struct rabbitmq_runtime {
+struct rabbitmq_runtime
+{
     char* url;
     atomic_bool stop;
 
@@ -60,10 +62,7 @@ static rmq_action_t rabbitmq_dispatch(const rmq_message_t* message, void* userda
         return RMQ_REQUEUE;
     }
 
-    worker->last_action = worker->route->handler(
-        message,
-        worker->route->handler_context
-    );
+    worker->last_action = worker->route->handler(message, worker->route->handler_context);
 
     return worker->last_action;
 }
@@ -88,12 +87,7 @@ static void* rabbitmq_worker_main(void* arg)
         rmq_result_t result = rmq_connect(&client, &config, &error);
         if (result != RMQ_OK)
         {
-            logger_error(
-                "RabbitMQ queue=%s operation=%s error=%s",
-                worker->route->queue,
-                error.operation,
-                error.detail
-            );
+            logger_error("RabbitMQ queue=%s operation=%s error=%s", worker->route->queue, error.operation, error.detail);
 
             rabbitmq_retry_pause(worker->stop);
             continue;
@@ -103,22 +97,12 @@ static void* rabbitmq_worker_main(void* arg)
 
         if (result == RMQ_OK && !atomic_load(worker->stop))
         {
-            result = rmq_subscribe(
-                client,
-                worker->route->queue,
-                worker->route->prefetch,
-                &error
-            );
+            result = rmq_subscribe(client, worker->route->queue, worker->route->prefetch, &error);
         }
 
         if (result != RMQ_OK)
         {
-            logger_error(
-                "RabbitMQ queue=%s operation=%s error=%s",
-                worker->route->queue,
-                error.operation,
-                error.detail
-            );
+            logger_error("RabbitMQ queue=%s operation=%s error=%s", worker->route->queue, error.operation, error.detail);
 
             rmq_disconnect(client);
             rabbitmq_retry_pause(worker->stop);
@@ -129,25 +113,14 @@ static void* rabbitmq_worker_main(void* arg)
         {
             worker->last_action = RMQ_ACK;
 
-            result = rmq_consume_one(
-                client,
-                1000,
-                rabbitmq_dispatch,
-                worker,
-                &error
-            );
+            result = rmq_consume_one(client, 1000, rabbitmq_dispatch, worker, &error);
 
             if (result == RMQ_IDLE)
                 continue;
 
             if (result != RMQ_OK)
             {
-                logger_error(
-                    "RabbitMQ queue=%s operation=%s error=%s",
-                    worker->route->queue,
-                    error.operation,
-                    error.detail
-                );
+                logger_error("RabbitMQ queue=%s operation=%s error=%s", worker->route->queue, error.operation, error.detail);
                 break;
             }
 
@@ -224,20 +197,11 @@ bool rabbitmq_runtime_start(rabbitmq_runtime_t** out)
         worker->stop = &runtime->stop;
         worker->last_action = RMQ_ACK;
 
-        int rc = pthread_create(
-            &worker->thread,
-            NULL,
-            rabbitmq_worker_main,
-            worker
-        );
+        int rc = pthread_create(&worker->thread, NULL, rabbitmq_worker_main, worker);
 
         if (rc != 0)
         {
-            logger_error(
-                "RabbitMQ: cannot start worker queue=%s: %s",
-                worker->route->queue,
-                strerror(rc)
-            );
+            logger_error("RabbitMQ: cannot start worker queue=%s: %s", worker->route->queue, strerror(rc));
 
             rabbitmq_runtime_stop(runtime);
             return false;
@@ -276,13 +240,7 @@ void rabbitmq_runtime_stop(rabbitmq_runtime_t* runtime)
     free(runtime);
 }
 
-rmq_result_t rabbitmq_publish_json(
-    rabbitmq_route_id_t route_id,
-    const void* data,
-    size_t size,
-    const char* message_id,
-    rmq_error_t* error
-)
+rmq_result_t rabbitmq_publish_json(rabbitmq_route_id_t route_id, const void* data, size_t size, const char* message_id, rmq_error_t* error)
 {
     if (!data || size == 0)
         return RMQ_INVALID_ARGUMENT;
@@ -317,10 +275,11 @@ rmq_result_t rabbitmq_publish_json(
         rmq_publish_t publication = {
             .exchange = route->exchange,
             .routing_key = route->routing_key,
-            .body = {
-                .data = data,
-                .size = size,
-            },
+            .body =
+                {
+                    .data = data,
+                    .size = size,
+                },
             .content_type = "application/json",
             .message_id = message_id && *message_id ? message_id : NULL,
             .correlation_id = NULL,
@@ -329,12 +288,7 @@ rmq_result_t rabbitmq_publish_json(
             .mandatory = true,
         };
 
-        result = rmq_publish(
-            client,
-            &publication,
-            5000,
-            error
-        );
+        result = rmq_publish(client, &publication, 5000, error);
     }
 
     rmq_disconnect(client);

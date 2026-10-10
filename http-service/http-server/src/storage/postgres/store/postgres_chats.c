@@ -111,7 +111,8 @@ db_result_t db_chat_create_setting(db_t* db, uint64_t chat_id, chat_setting_t* s
     return result;
 }
 
-typedef struct {
+typedef struct
+{
     chat_t* chat;
     chat_member_t* members;
     size_t members_count;
@@ -133,8 +134,7 @@ static db_result_t db_chat_create_all_tx(db_t* db, void* arg)
     return db_chat_create_members(db, args->chat_id, args->members, args->members_count);
 }
 
-db_result_t db_chat_create_all(db_t* db, chat_t* chat, chat_member_t* members, size_t members_count, chat_setting_t* setting,
-                               uint64_t* out_chat_id)
+db_result_t db_chat_create_all(db_t* db, chat_t* chat, chat_member_t* members, size_t members_count, chat_setting_t* setting, uint64_t* out_chat_id)
 {
     db_chat_create_all_args_t args = {
         .chat = chat,

@@ -89,10 +89,10 @@ static bool is_simple_password(const char* password)
 
 static bool validation_error(char* error, size_t error_size, const char* key)
 {
-	if (error && error_size > 0)
-		snprintf(error, error_size, "%s", key);
+    if (error && error_size > 0)
+        snprintf(error, error_size, "%s", key);
 
-	return false;
+    return false;
 }
 
 bool validate_password(const void* value, char* error, size_t error_size)
@@ -106,8 +106,8 @@ bool validate_password(const void* value, char* error, size_t error_size)
     {
         if (*p < 0x20 || *p == 0x7F)
         {
-			return validation_error(error, error_size, "validation.password-control-characters");
-		}
+            return validation_error(error, error_size, "validation.password-control-characters");
+        }
     }
 
     if (is_simple_password(password))
@@ -118,27 +118,27 @@ bool validate_password(const void* value, char* error, size_t error_size)
 
 bool validate_email(const void* value, char* error, size_t error_size)
 {
-	const char* email = (const char*)value;
+    const char* email = (const char*)value;
 
-	if (!email || !*email)
-		return validation_error(error, error_size, "validation.email-invalid");
+    if (!email || !*email)
+        return validation_error(error, error_size, "validation.email-invalid");
 
-	size_t len = strlen(email);
+    size_t len = strlen(email);
 
-	if (len > 255)
-		return validation_error(error, error_size, "validation.email-too-long");
+    if (len > 255)
+        return validation_error(error, error_size, "validation.email-too-long");
 
-	const char* at = strchr(email, '@');
+    const char* at = strchr(email, '@');
 
-	if (!at || at == email || at[1] == '\0' || strchr(at + 1, '@'))
-		return validation_error(error, error_size, "validation.email-invalid");
+    if (!at || at == email || at[1] == '\0' || strchr(at + 1, '@'))
+        return validation_error(error, error_size, "validation.email-invalid");
 
-	size_t local_len = (size_t)(at - email);
-	if (local_len > 64)
-		return validation_error(error, error_size, "validation.email-local-too-long");
+    size_t local_len = (size_t)(at - email);
+    if (local_len > 64)
+        return validation_error(error, error_size, "validation.email-local-too-long");
 
-	if (email[0] == '.' || email[local_len - 1] == '.')
-		return validation_error(error, error_size, "validation.email-invalid");
+    if (email[0] == '.' || email[local_len - 1] == '.')
+        return validation_error(error, error_size, "validation.email-invalid");
 
     bool previous_dot = false;
 
@@ -157,7 +157,7 @@ bool validate_email(const void* value, char* error, size_t error_size)
         previous_dot = false;
 
         if (!isalnum(c) && c != '_' && c != '-' && c != '+' && c != '%')
-			return validation_error(error, error_size, "validation.email-invalid");
+            return validation_error(error, error_size, "validation.email-invalid");
     }
 
     const char* domain = at + 1;

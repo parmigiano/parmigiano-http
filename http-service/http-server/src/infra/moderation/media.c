@@ -32,7 +32,8 @@
 #define MODERATION_MAX_DOWNLOAD_BYTES (500ULL * 1024ULL * 1024ULL)
 #define MODERATION_PROCESS_TIMEOUT_SEC 20
 
-typedef struct {
+typedef struct
+{
     FILE* file;
     size_t written;
     size_t max_bytes;
@@ -41,7 +42,8 @@ typedef struct {
     char content_type[128];
 } moderation_s3_download_t;
 
-typedef struct {
+typedef struct
+{
     S3Status status;
 } moderation_s3_action_t;
 
@@ -77,9 +79,8 @@ static int ascii_starts_with_ci(const char* value, const char* prefix)
 
 static bool s3_config_valid(const s3_config_t* cfg)
 {
-    return cfg && cfg->endpoint && *cfg->endpoint && cfg->bucket && *cfg->bucket &&
-           cfg->access_key && *cfg->access_key && cfg->secret_key && *cfg->secret_key &&
-           cfg->region && *cfg->region;
+    return cfg && cfg->endpoint && *cfg->endpoint && cfg->bucket && *cfg->bucket && cfg->access_key && *cfg->access_key && cfg->secret_key &&
+           *cfg->secret_key && cfg->region && *cfg->region;
 }
 
 static S3BucketContext make_bucket_ctx(const s3_config_t* cfg)
@@ -307,13 +308,8 @@ static const char* infer_mime(const char* reference)
     return "application/octet-stream";
 }
 
-static moderation_media_result_t download_target(const moderation_target_t* target,
-                                                  char* path,
-                                                  size_t path_size,
-                                                  char* mime,
-                                                  size_t mime_size,
-                                                  char* detail,
-                                                  size_t detail_size)
+static moderation_media_result_t download_target(const moderation_target_t* target, char* path, size_t path_size, char* mime, size_t mime_size,
+                                                 char* detail, size_t detail_size)
 {
     if (!target || !target->content_ref || !path || !mime)
         return MODERATION_MEDIA_ERROR;
@@ -367,10 +363,11 @@ static moderation_media_result_t download_target(const moderation_target_t* targ
 
     S3BucketContext bucket = make_bucket_ctx(&cfg);
     S3GetObjectHandler handler = {
-        .responseHandler = {
-            .propertiesCallback = download_properties_cb,
-            .completeCallback = download_complete_cb,
-        },
+        .responseHandler =
+            {
+                .propertiesCallback = download_properties_cb,
+                .completeCallback = download_complete_cb,
+            },
         .getObjectDataCallback = download_data_cb,
     };
 
@@ -407,10 +404,7 @@ static moderation_media_result_t download_target(const moderation_target_t* targ
     return MODERATION_MEDIA_CLEAN;
 }
 
-static moderation_media_result_t map_nsfw_result(nsfw_result_t result,
-                                                  const nsfw_error_t* error,
-                                                  char* detail,
-                                                  size_t detail_size)
+static moderation_media_result_t map_nsfw_result(nsfw_result_t result, const nsfw_error_t* error, char* detail, size_t detail_size)
 {
     if (result == NSFW_OK)
         return MODERATION_MEDIA_CLEAN;
@@ -442,9 +436,7 @@ static moderation_media_result_t scan_frame(const char* path, char* detail, size
     return map_nsfw_result(result, &error, detail, detail_size);
 }
 
-static moderation_media_result_t normalize_and_scan_image(const char* input,
-                                                           char* detail,
-                                                           size_t detail_size)
+static moderation_media_result_t normalize_and_scan_image(const char* input, char* detail, size_t detail_size)
 {
     char directory[512];
     if (create_temp_dir(directory, sizeof(directory)) != 0)
@@ -457,13 +449,8 @@ static moderation_media_result_t normalize_and_scan_image(const char* input,
     snprintf(output, sizeof(output), "%s/image.jpg", directory);
 
     char* argv[] = {
-        "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-        "-i", (char*)input,
-        "-frames:v", "1",
-        "-vf", "scale=min(1024\\,iw):-2",
-        "-q:v", "6",
-        output,
-        NULL,
+        "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-i", (char*)input, "-frames:v", "1", "-vf", "scale=min(1024\\,iw):-2",
+        "-q:v",   "6",        output,         NULL,
     };
 
     if (run_process(argv) != 0)
@@ -480,9 +467,7 @@ static moderation_media_result_t normalize_and_scan_image(const char* input,
     return result;
 }
 
-static moderation_media_result_t extract_and_scan_frames(const char* input,
-                                                          char* detail,
-                                                          size_t detail_size)
+static moderation_media_result_t extract_and_scan_frames(const char* input, char* detail, size_t detail_size)
 {
     char directory[512];
     if (create_temp_dir(directory, sizeof(directory)) != 0)
@@ -497,24 +482,14 @@ static moderation_media_result_t extract_and_scan_frames(const char* input,
     snprintf(end_pattern, sizeof(end_pattern), "%s/end-%%02d.jpg", directory);
 
     char* start_argv[] = {
-        "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-        "-i", (char*)input,
-        "-vf", "fps=1/15,scale=min(1024\\,iw):-2",
-        "-frames:v", "3",
-        "-q:v", "6",
-        start_pattern,
-        NULL,
+        "ffmpeg",    "-nostdin", "-hide_banner", "-loglevel", "error",       "-y", "-i", (char*)input, "-vf", "fps=1/15,scale=min(1024\\,iw):-2",
+        "-frames:v", "3",        "-q:v",         "6",         start_pattern, NULL,
     };
 
     char* end_argv[] = {
-        "ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y",
-        "-sseof", "-60",
-        "-i", (char*)input,
-        "-vf", "fps=1/20,scale=min(1024\\,iw):-2",
-        "-frames:v", "3",
-        "-q:v", "6",
-        end_pattern,
-        NULL,
+        "ffmpeg",    "-nostdin", "-hide_banner", "-loglevel",  "error",     "-y",
+        "-sseof",    "-60",      "-i",           (char*)input, "-vf",       "fps=1/20,scale=min(1024\\,iw):-2",
+        "-frames:v", "3",        "-q:v",         "6",          end_pattern, NULL,
     };
 
     int start_ok = run_process(start_argv) == 0;
@@ -576,9 +551,7 @@ cleanup:
     return final_result;
 }
 
-moderation_media_result_t moderation_media_scan(const moderation_target_t* target,
-                                                 char* detail,
-                                                 size_t detail_size)
+moderation_media_result_t moderation_media_scan(const moderation_target_t* target, char* detail, size_t detail_size)
 {
     if (!target || !detail || detail_size == 0)
         return MODERATION_MEDIA_ERROR;
@@ -592,9 +565,7 @@ moderation_media_result_t moderation_media_scan(const moderation_target_t* targe
         return download;
 
     moderation_media_result_t result;
-    bool animated_or_video = strcmp(target->content_type, "video") == 0 ||
-                             ascii_ieq(mime, "image/gif") ||
-                             ascii_ieq(mime, "image/webp");
+    bool animated_or_video = strcmp(target->content_type, "video") == 0 || ascii_ieq(mime, "image/gif") || ascii_ieq(mime, "image/webp");
 
     if (animated_or_video)
     {
@@ -611,8 +582,7 @@ moderation_media_result_t moderation_media_scan(const moderation_target_t* targe
             fclose(file);
         }
 
-        if (size > 0 && (size_t)size <= NSFW_MAX_IMAGE_BYTES &&
-            (ascii_ieq(mime, "image/jpeg") || ascii_ieq(mime, "image/png")))
+        if (size > 0 && (size_t)size <= NSFW_MAX_IMAGE_BYTES && (ascii_ieq(mime, "image/jpeg") || ascii_ieq(mime, "image/png")))
         {
             nsfw_error_t error = {0};
             nsfw_result_t nsfw = nsfw_check_file_from_env(path, mime, &error);
