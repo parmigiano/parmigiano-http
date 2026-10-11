@@ -20,6 +20,7 @@ redis:
       - any-glob-to-any-file:
           - http-service/*/src/storage/redis/**
           - http-service/*/include/redis/**
+          - http-service/share/redis/**
 
 docker:
   - changed-files:

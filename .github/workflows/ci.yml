@@ -38,7 +38,8 @@ jobs:
             --error-exitcode=1 \
             -I include \
             -I ../share/postgres/include \
-            src/ include/ ../share/postgres/src ../share/postgres/include
+            -I ../share/redis/include \
+            src/ include/ ../share/postgres/src ../share/postgres/include ../share/redis/src ../share/redis/include
 
       - name: Run cppcheck (auth-server)
         working-directory: http-service/auth-server
@@ -54,6 +55,7 @@ jobs:
             --error-exitcode=1 \
             -I include \
             -I ../share/postgres/include \
+            -I ../share/redis/include \
             src/ include/
 
   repository-validation:

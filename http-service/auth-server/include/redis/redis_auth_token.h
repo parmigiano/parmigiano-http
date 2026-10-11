@@ -4,6 +4,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define REDIS_AUTH_TOKEN_TTL 600
+
 typedef enum
 {
     REDIS_AUTH_TOKEN_REGISTRATION = 1,

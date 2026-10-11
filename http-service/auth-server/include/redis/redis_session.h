@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+#define REDIS_SESSION_TTL 172800
+
 typedef struct {
     uint64_t user_uid;
     uint64_t expires_at;
