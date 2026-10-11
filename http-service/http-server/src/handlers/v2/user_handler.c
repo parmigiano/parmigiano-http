@@ -255,7 +255,7 @@ void user_update_profile_handler_v2(chttpx_request_t* req, chttpx_response_t* re
         cHTTPX_StringField("phone", &payload.phone, false, 8, 254, CHTTPX_TRIM, NULL),
         chttpx_validation_boolean("phone_visible", &phone_visible, false),
         cHTTPX_StringField("overview", &payload.overview, false, 1, 125, CHTTPX_TRIM, NULL),
-        cHTTPX_StringField("password", &payload.password, false, 8, 16, CHTTPX_NORMALIZE_NONE, validate_password),
+        cHTTPX_StringField("password", &payload.password, false, 8, 128, CHTTPX_NORMALIZE_NONE, validate_password),
     };
 
     if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))

@@ -1409,7 +1409,7 @@
           "password": {
             "type": "string",
             "minLength": 8,
-            "maxLength": 255,
+            "maxLength": 128,
             "example": "strongpassword123"
           }
         }

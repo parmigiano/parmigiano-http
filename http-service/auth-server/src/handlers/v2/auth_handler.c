@@ -194,7 +194,7 @@ void auth_login_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
 
     chttpx_validation_t fields[] = {
         cHTTPX_StringField("email", &payload.email, true, 5, 254, CHTTPX_TRIM | CHTTPX_LOWERCASE, validate_email),
-        cHTTPX_StringField("password", &payload.password, false, 8, 16, CHTTPX_NORMALIZE_NONE, NULL),
+        cHTTPX_StringField("password", &payload.password, false, 8, 128, CHTTPX_NORMALIZE_NONE, NULL),
         cHTTPX_StringField("login_token", &payload.login_token, false, 0, 64, CHTTPX_NORMALIZE_NONE, NULL),
     };
 
@@ -204,10 +204,13 @@ void auth_login_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))
         return;
 
-    user = db_user_core_get_by_email(app_context->db, payload.email);
+    db_result_t lookup = db_user_core_lookup_by_email(app_context->db, payload.email, &user);
+    if (db_reply_result(req, res, lookup))
+        goto cleanup;
+
     if (!user)
     {
-        *res = cHTTPX_ResError(cHTTPX_StatusNotFound, cHTTPX_i18n_t("error.user-not-found", req->language));
+        *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.incorrect-login-data", req->language));
         goto cleanup;
     }
 
@@ -271,7 +274,7 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         cHTTPX_StringField("name", &payload.name, true, 0, 96, CHTTPX_TRIM, validate_name),
         cHTTPX_StringField("username", &payload.username, true, 4, 24, CHTTPX_TRIM, validate_username),
         cHTTPX_StringField("email", &payload.email, true, 5, 254, CHTTPX_TRIM | CHTTPX_LOWERCASE, validate_email),
-        cHTTPX_StringField("password", &payload.password, false, 8, 16, CHTTPX_NORMALIZE_NONE, validate_password),
+        cHTTPX_StringField("password", &payload.password, false, 8, 128, CHTTPX_NORMALIZE_NONE, validate_password),
         cHTTPX_StringField("registration_token", &payload.registration_token, false, 0, 64, CHTTPX_NORMALIZE_NONE, NULL),
     };
 
