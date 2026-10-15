@@ -30,3 +30,8 @@ CREATE INDEX IF NOT EXISTS idx_moderation_violations_user_created
 
 CREATE INDEX IF NOT EXISTS idx_moderation_violations_created
     ON moderation_violations (created_at DESC);
+
+-- DROP INDEX IF EXISTS idx_moderation_violations_user_created;
+-- DROP INDEX IF EXISTS idx_moderation_violations_created;
+-- DROP TABLE IF EXISTS moderation_user_stats;
+-- DROP TABLE IF EXISTS moderation_violations;

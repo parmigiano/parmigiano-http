@@ -7,6 +7,7 @@
 #include "profanity.h"
 #include "utilities.h"
 #include "postgres/validate.h"
+#include "redis/redis_user_cache.h"
 
 #include <inttypes.h>
 
@@ -157,6 +158,9 @@ void user_upload_avatar_handler_v2(chttpx_request_t* req, chttpx_response_t* res
     if (db_reply_result(req, res, user_upd_result))
         goto cleanup;
 
+    if (redis_user_info_delete(ctx->user->user_uid) != 0)
+        logger_warn("user_upload_avatar_handler_v2 req={%s}: failed to drop cached user", req->request_id);
+
     remove_uploaded_file = false;
 
     /* The profile already points to the new avatar, so failure to delete the old object is non-fatal. */
@@ -286,6 +290,9 @@ void user_update_profile_handler_v2(chttpx_request_t* req, chttpx_response_t* re
     db_result_t user_db_result = db_user_UPDATE_upd(app_context->db, ctx->user->user_uid, &payload);
     if (db_reply_result(req, res, user_db_result))
         goto cleanup;
+
+    if (redis_user_info_delete(ctx->user->user_uid) != 0)
+        logger_warn("user_update_profile_handler_v2 req={%s}: failed to drop cached user", req->request_id);
 
     *res = cHTTPX_ResMessage(cHTTPX_StatusOK, cHTTPX_i18n_t("profile-updated", req->language));
 

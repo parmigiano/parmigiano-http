@@ -103,14 +103,8 @@ db_result_t db_transaction(db_t* db, db_tx_fn fn, void* arg);
 db_result_t db_hold(db_t* db, db_tx_fn fn, void* arg);
 const char* db_error_message(db_t* db);
 db_result_t db_last_result(void);
-
-static inline db_result_t db_fatal_result(PGresult* res)
-{
-    const char* sqlstate = res ? PQresultErrorField(res, PG_DIAG_SQLSTATE) : NULL;
-    if (sqlstate && strcmp(sqlstate, "57014") == 0)
-        return DB_TIMEOUT;
-    return DB_ERROR;
-}
+const char* db_last_constraint(void);
+db_result_t db_fatal_result(PGresult* res);
 
 typedef struct {
     char **columns;

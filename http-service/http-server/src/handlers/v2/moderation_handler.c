@@ -6,6 +6,7 @@
 #include "rabbitmq_app.h"
 
 #include "postgres/postgres_moderation.h"
+#include "redis/redis_user_cache.h"
 
 #include <cjson/cJSON.h>
 
@@ -286,6 +287,9 @@ rmq_action_t moderation_data_handler_v2(const rmq_message_t* message, void* user
         db_moderation_target_free(target);
         return RMQ_ACK;
     }
+
+    if (redis_user_info_delete(target->user_uid) != 0 || redis_user_block_delete(target->user_uid) != 0)
+        logger_warn("moderation_data_handler_v2 user_uid={%" PRIu64 "}: failed to drop cached user", target->user_uid);
 
     if (moderation_media_delete_object(target) != 0)
     {

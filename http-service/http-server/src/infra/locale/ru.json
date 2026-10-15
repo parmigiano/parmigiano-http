@@ -103,6 +103,7 @@
     "error.invalid-moderation-target": "Неверная или неподдерживаемая цель модерации",
     "error.database-connection-timeout": "Время ожидания подключения к базе данных истекло",
     "error.repeating-data-request": "Повторяющие данные в запросе",
+    "error.field-taken": "Поле '%s' уже занято",
     "error.perform-database-operation": "Не удалось выполнить операцию с базой данных",
     "error.user-not-found": "Пользователь не был найден",
     "error.session-creation-error": "Ошибка создании сессии",

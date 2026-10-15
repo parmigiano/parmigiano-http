@@ -103,6 +103,7 @@
     "error.invalid-moderation-target": "Invalid or unsupported moderation target",
     "error.database-connection-timeout": "Database connection timeout",
     "error.repeating-data-request": "Repeating data in request",
+    "error.field-taken": "Field '%s' is already taken",
     "error.perform-database-operation": "Failed to perform database operation",
     "error.user-not-found": "User not found",
     "error.session-creation-error": "Error creating session",

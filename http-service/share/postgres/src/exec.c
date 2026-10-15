@@ -12,23 +12,7 @@ static int connection_failed(PGconn* conn)
 
 static db_result_t map_status(PGresult* result)
 {
-    if (!result)
-        return DB_ERROR;
-
-    ExecStatusType status = PQresultStatus(result);
-    if (status == PGRES_COMMAND_OK || status == PGRES_TUPLES_OK)
-    {
-        db_set_last(DB_OK, "");
-        return DB_OK;
-    }
-
-    const char* sqlstate = PQresultErrorField(result, PG_DIAG_SQLSTATE);
-    const char* message = PQresultErrorMessage(result);
-
-    db_result_t code = (sqlstate && strcmp(sqlstate, "57014") == 0) ? DB_TIMEOUT : DB_ERROR;
-    db_set_last(code, message);
-
-    return code;
+    return db_map_pg_result(result);
 }
 
 static PGresult* run_params(db_t* db, const char* query, int n_params, const char** params, int* discard)

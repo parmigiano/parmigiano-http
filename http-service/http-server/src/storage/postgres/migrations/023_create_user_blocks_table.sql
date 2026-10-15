@@ -26,3 +26,7 @@ CREATE INDEX idx_user_blocks_active_user
 
 CREATE INDEX idx_user_blocks_created_at
     ON user_blocks (created_at DESC);
+
+-- DROP INDEX IF EXISTS idx_user_blocks_active_user;
+-- DROP INDEX IF EXISTS idx_user_blocks_created_at;
+-- DROP TABLE IF EXISTS user_blocks;

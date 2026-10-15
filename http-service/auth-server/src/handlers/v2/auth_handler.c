@@ -9,6 +9,7 @@
 #include "redis/redis_auth_token.h"
 #include "redis/redis_limits.h"
 #include "redis/redis_session.h"
+#include "redis/redis_user_cache.h"
 #include "redis/redis_verifycode.h"
 #include "postgres/postgres_users.h"
 #include "postgres/validate.h"
@@ -518,6 +519,9 @@ void auth_verify_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         db_result_t confirm_result = db_user_core_upd_email_confirm(app_context->db, true, payload.email);
         if (db_reply_result(req, res, confirm_result))
             goto cleanup;
+
+        if (redis_user_info_delete(user->user_uid) != 0)
+            logger_warn("auth_verify_handler_v2 req={%s}: failed to drop cached user", req->request_id);
     }
 
     if (!user)
@@ -590,6 +594,9 @@ void auth_delete_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     db_result_t user_del_db_result = db_user_del_by_uid(app_context->db, ctx->user->user_uid);
     if (db_reply_result(req, res, user_del_db_result))
         return;
+
+    if (redis_user_info_delete(ctx->user->user_uid) != 0 || redis_user_block_delete(ctx->user->user_uid) != 0)
+        logger_warn("auth_delete_handler_v2 req={%s}: failed to drop cached user", req->request_id);
 
     /* DELETE AVATAR S3 */
     s3_config_t s3_config = {

@@ -54,6 +54,7 @@ typedef struct
 static _Thread_local db_pin_t tls_pin;
 static _Thread_local db_result_t tls_last = DB_OK;
 static _Thread_local char tls_err[768];
+static _Thread_local char tls_constraint[128];
 
 static int64_t mono_ms(void)
 {
@@ -87,6 +88,66 @@ void db_set_last(db_result_t result, const char* message)
 {
     tls_last = result;
     snprintf(tls_err, sizeof(tls_err), "%s", message ? message : "");
+    tls_constraint[0] = '\0';
+}
+
+const char* db_last_constraint(void)
+{
+    return tls_constraint;
+}
+
+db_result_t db_map_pg_result(PGresult* result)
+{
+    if (!result)
+    {
+        db_set_last(DB_ERROR, "");
+        return DB_ERROR;
+    }
+
+    ExecStatusType status = PQresultStatus(result);
+    if (status == PGRES_COMMAND_OK || status == PGRES_TUPLES_OK)
+    {
+        db_set_last(DB_OK, "");
+        return DB_OK;
+    }
+
+    const char* sqlstate = PQresultErrorField(result, PG_DIAG_SQLSTATE);
+    const char* message = PQresultErrorMessage(result);
+    db_result_t code = DB_ERROR;
+
+    if (sqlstate && strcmp(sqlstate, "57014") == 0)
+        code = DB_TIMEOUT;
+    else if (sqlstate && strcmp(sqlstate, "23505") == 0)
+        code = DB_DUPLICATE;
+
+    db_set_last(code, message);
+    if (code == DB_DUPLICATE)
+    {
+        const char* detail = PQresultErrorField(result, PG_DIAG_MESSAGE_DETAIL);
+        const char* start = detail ? strstr(detail, "Key (") : NULL;
+        const char* end = start ? strchr(start + 5, ')') : NULL;
+
+        if (start && end && end > start + 5)
+        {
+            size_t len = (size_t)(end - (start + 5));
+            if (len >= sizeof(tls_constraint))
+                len = sizeof(tls_constraint) - 1;
+            memcpy(tls_constraint, start + 5, len);
+            tls_constraint[len] = '\0';
+        }
+        else
+        {
+            const char* constraint = PQresultErrorField(result, PG_DIAG_CONSTRAINT_NAME);
+            snprintf(tls_constraint, sizeof(tls_constraint), "%s", constraint ? constraint : "");
+        }
+    }
+
+    return code;
+}
+
+db_result_t db_fatal_result(PGresult* res)
+{
+    return db_map_pg_result(res);
 }
 
 db_result_t db_last_result(void)
@@ -448,10 +509,8 @@ static db_result_t db_command(PGconn* conn, const char* query)
         return DB_OK;
     }
 
-    const char* sqlstate = PQresultErrorField(result, PG_DIAG_SQLSTATE);
     const char* message = PQresultErrorMessage(result);
-    db_result_t code = (sqlstate && strcmp(sqlstate, "57014") == 0) ? DB_TIMEOUT : DB_ERROR;
-    db_set_last(code, message);
+    db_result_t code = db_map_pg_result(result);
     logger_error("db: database error: %s", message ? message : "");
     PQclear(result);
     return code;
@@ -529,11 +588,14 @@ db_result_t db_transaction(db_t* db, db_tx_fn fn, void* arg)
     else
     {
         char saved[768];
+        char saved_constraint[sizeof(tls_constraint)];
         snprintf(saved, sizeof(saved), "%s", tls_err);
+        snprintf(saved_constraint, sizeof(saved_constraint), "%s", tls_constraint);
         db_result_t saved_code = tls_last;
         rollback_open(conn);
         tls_last = saved_code;
         snprintf(tls_err, sizeof(tls_err), "%s", saved);
+        snprintf(tls_constraint, sizeof(tls_constraint), "%s", saved_constraint);
     }
 
     if (PQstatus(conn) != CONNECTION_OK)

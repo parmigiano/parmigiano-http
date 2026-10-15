@@ -3,6 +3,7 @@
 
 #include "handlers.h"
 #include "redis/redis_session.h"
+#include "redis/redis_user_cache.h"
 #include "postgres/postgres_users.h"
 #include "postgres/postgres_user_blocks.h"
 
@@ -31,25 +32,41 @@ chttpx_middleware_result_t authenticate_middleware(chttpx_request_t* req, chttpx
     free(session);
     session = NULL;
 
-    user_info_t* user = db_user_info_get_by_uid(app_context->db, user_uid);
-    if (!user)
+    user_info_t* user = NULL;
+    if (redis_user_info_get(user_uid, &user) != 1)
     {
-        *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
-        return out;
+        user = db_user_info_get_by_uid(app_context->db, user_uid);
+        if (!user)
+        {
+            *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
+            return out;
+        }
+
+        redis_user_info_set(user);
     }
 
-    user_block_t* block = NULL;
-    db_result_t block_result = db_user_block_get_active(app_context->db, user_uid, &block);
-    if (block_result != DB_OK)
+    int blocked = 0;
+    if (redis_user_block_get(user_uid, &blocked) != 1)
     {
-        db_user_info_free(user);
-        *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
-        return out;
-    }
+        user_block_t* block = NULL;
 
-    if (block)
-    {
+        db_result_t block_result = db_user_block_get_active(app_context->db, user_uid, &block);
+        if (block_result != DB_OK)
+        {
+            db_user_info_free(user);
+
+            *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+            return out;
+        }
+
+        blocked = block != NULL;
+        
+        redis_user_block_set(user_uid, block);
         db_user_block_free(block);
+    }
+
+    if (blocked)
+    {
         db_user_info_free(user);
 
         /* Do not refresh a blocked user's session TTL. */
