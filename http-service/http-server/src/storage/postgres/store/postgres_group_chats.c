@@ -4,7 +4,7 @@
 #include "logger.h"
 
 /* Create chat group and return chat id */
-db_result_t db_group_chat_create(db_t* db, chat_group_t* chat_group, uint64_t* out_chat_group_id)
+db_result_t db_group_chat_create(db_t* db, db_chat_group_t* chat_group, uint64_t* out_chat_group_id)
 {
     const char* query = "INSERT INTO chat_groups (user_uid, name) VALUES ($1, $2) RETURNING id";
 
@@ -200,7 +200,7 @@ db_result_t db_group_chat_delete(db_t* db, uint64_t user_uid, uint64_t group_id)
     return result;
 }
 
-// chat_group_LIST_t* db_group_chat_get_list(db_t* db, uint64_t user_uid)
+// db_result_t db_group_chat_get_list(db_t* db, uint64_t user_uid, db_chat_group_LIST_t** out_groups)
 // {
 //     const char* query = "SELECT\n"
 //                         "   chat_groups.id,\n"
@@ -225,28 +225,28 @@ db_result_t db_group_chat_delete(db_t* db, uint64_t user_uid, uint64_t group_id)
 //     {
 //         logger_error("db_group_chat_get_list user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
 //         free_result_set(rc);
-//         return NULL;
+//         return result;
 //     }
 
 //     if (!rc || rc->n_rows == 0)
 //     {
 //         free_result_set(rc);
-//         return NULL;
+//         return DB_OK;
 //     }
 
-//     chat_group_LIST_t* list = malloc(sizeof(chat_group_LIST_t));
+//     db_chat_group_LIST_t* list = malloc(sizeof(db_chat_group_LIST_t));
 //     if (!list)
 //     {
-//         logger_error("db_group_chat_get_list user_uid={%lu}: malloc failed for chat_group_LIST_t", user_uid);
+//         logger_error("db_group_chat_get_list user_uid={%lu}: malloc failed for db_chat_group_LIST_t", user_uid);
 
 //         fprintf(stderr, "malloc failed\n");
 
 //         free_result_set(rc);
-//         return NULL;
+//         return DB_ERROR;
 //     }
 
 //     list->count = rc->n_rows;
-//     list->items = calloc(list->count, sizeof(chat_group_all_t));
+//     list->items = calloc(list->count, sizeof(db_chat_group_all_t));
 //     if (!list->items)
 //     {
 //         logger_error("db_group_chat_get_list user_uid={%lu}: calloc failed for list->items", user_uid);
@@ -255,12 +255,12 @@ db_result_t db_group_chat_delete(db_t* db, uint64_t user_uid, uint64_t group_id)
 
 //         free(list);
 //         free_result_set(rc);
-//         return NULL;
+//         return DB_ERROR;
 //     }
 
 //     for (size_t i = 0; i < rc->n_rows; i++)
 //     {
-//         chat_group_all_t* chat_group = &list->items[i];
+//         db_chat_group_all_t* chat_group = &list->items[i];
 
 //         chat_group->id = strtoull(rc->rows[i].columns[0], NULL, 10);
 //         chat_group->created_at = parse_pg_timestamp(rc->rows[i].columns[1]);

@@ -308,7 +308,7 @@ static const char* infer_mime(const char* reference)
     return "application/octet-stream";
 }
 
-static moderation_media_result_t download_target(const moderation_target_t* target, char* path, size_t path_size, char* mime, size_t mime_size,
+static moderation_media_result_t download_target(const db_moderation_target_t* target, char* path, size_t path_size, char* mime, size_t mime_size,
                                                  char* detail, size_t detail_size)
 {
     if (!target || !target->content_ref || !path || !mime)
@@ -551,7 +551,7 @@ cleanup:
     return final_result;
 }
 
-moderation_media_result_t moderation_media_scan(const moderation_target_t* target, char* detail, size_t detail_size)
+moderation_media_result_t moderation_media_scan(const db_moderation_target_t* target, char* detail, size_t detail_size)
 {
     if (!target || !detail || detail_size == 0)
         return MODERATION_MEDIA_ERROR;
@@ -603,7 +603,7 @@ moderation_media_result_t moderation_media_scan(const moderation_target_t* targe
     return result;
 }
 
-int moderation_media_delete_object(const moderation_target_t* target)
+int moderation_media_delete_object(const db_moderation_target_t* target)
 {
     if (!target || !target->content_ref || !target->target_type)
         return -1;

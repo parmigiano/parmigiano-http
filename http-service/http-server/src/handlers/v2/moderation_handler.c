@@ -223,7 +223,7 @@ rmq_action_t moderation_data_handler_v2(const rmq_message_t* message, void* user
         return RMQ_REJECT;
     }
 
-    moderation_target_t* target = NULL;
+    db_moderation_target_t* target = NULL;
     db_result_t db_result = db_moderation_target_get(app_context->db, task.target_type, task.target_id, &target);
     if (db_result != DB_OK)
     {
@@ -270,7 +270,7 @@ rmq_action_t moderation_data_handler_v2(const rmq_message_t* message, void* user
         return RMQ_REQUEUE;
     }
 
-    moderation_apply_result_t apply = {0};
+    db_moderation_apply_result_t apply = {0};
     db_result = db_moderation_apply_violation(app_context->db, target, task.reporter_uid, &apply);
     if (db_result != DB_OK)
     {

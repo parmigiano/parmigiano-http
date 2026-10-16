@@ -11,7 +11,7 @@ static bool moderation_target_type_valid(const char* target_type)
     return target_type && (strcmp(target_type, MODERATION_TARGET_AVATAR) == 0 || strcmp(target_type, MODERATION_TARGET_CHAT_MEDIA) == 0);
 }
 
-void db_moderation_target_free(moderation_target_t* target)
+void db_moderation_target_free(db_moderation_target_t* target)
 {
     if (!target)
         return;
@@ -22,7 +22,7 @@ void db_moderation_target_free(moderation_target_t* target)
     free(target);
 }
 
-db_result_t db_moderation_target_get(db_t* db, const char* target_type, uint64_t target_id, moderation_target_t** out_target)
+db_result_t db_moderation_target_get(db_t* db, const char* target_type, uint64_t target_id, db_moderation_target_t** out_target)
 {
     if (!db || !out_target || !moderation_target_type_valid(target_type) || target_id == 0)
         return DB_ERROR;
@@ -78,7 +78,7 @@ db_result_t db_moderation_target_get(db_t* db, const char* target_type, uint64_t
         return DB_ERROR;
     }
 
-    moderation_target_t* target = calloc(1, sizeof(*target));
+    db_moderation_target_t* target = calloc(1, sizeof(*target));
     if (!target)
     {
         PQclear(result);
@@ -166,7 +166,7 @@ static const char* moderation_apply_query(void)
            "FROM stats s JOIN blocked b USING (user_uid)";
 }
 
-db_result_t db_moderation_apply_violation(db_t* db, const moderation_target_t* target, uint64_t reporter_uid, moderation_apply_result_t* out_result)
+db_result_t db_moderation_apply_violation(db_t* db, const db_moderation_target_t* target, uint64_t reporter_uid, db_moderation_apply_result_t* out_result)
 {
     if (!db || !target || !out_result || !target->content_ref || !moderation_target_type_valid(target->target_type) || !target->user_uid ||
         !target->target_id)

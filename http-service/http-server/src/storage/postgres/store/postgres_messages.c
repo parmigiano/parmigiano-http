@@ -3,7 +3,7 @@
 
 #include "logger.h"
 
-db_result_t db_message_create(db_t* db, message_t* msg, uint64_t* out_message_id)
+db_result_t db_message_create(db_t* db, db_message_t* msg, uint64_t* out_message_id)
 {
     const char* query = "INSERT INTO messages (chat_id, sender_uid, content, content_type) VALUES ($1, $2, $3, $4) RETURNING id;";
 
@@ -86,7 +86,7 @@ db_result_t db_message_create_status(db_t* db, uint64_t message_id, uint64_t cha
 
 typedef struct
 {
-    message_t* msg;
+    db_message_t* msg;
     uint64_t message_id;
 } db_message_create_all_args_t;
 
@@ -101,7 +101,7 @@ static db_result_t db_message_create_all_tx(db_t* db, void* arg)
     return db_message_create_status(db, args->message_id, args->msg->chat_id, args->msg->sender_uid);
 }
 
-db_result_t db_message_create_all(db_t* db, message_t* msg)
+db_result_t db_message_create_all(db_t* db, db_message_t* msg)
 {
     db_message_create_all_args_t args = {
         .msg = msg,

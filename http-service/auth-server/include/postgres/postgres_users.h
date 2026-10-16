@@ -3,13 +3,6 @@
 
 #include "postgres/postgres.h"
 
-#include <time.h>
-#include <stdlib.h>
-#include <string.h>
-#include <stdint.h>
-#include <stdbool.h>
-#include <libpq-fe.h>
-
 /* table. USERS */
 /* ------------ */
 typedef struct {
@@ -20,7 +13,7 @@ typedef struct {
     char *email;
     bool email_confirm;
     char *password;
-} user_core_t;
+} db_user_core_t;
 
 typedef struct {
     uint64_t id;
@@ -32,7 +25,7 @@ typedef struct {
     char *username;
     char *overview;
     char *phone;
-} user_profile_t;
+} db_user_profile_t;
 
 typedef struct {
     uint64_t id;
@@ -42,14 +35,14 @@ typedef struct {
     bool email_visible;
     bool username_visible;
     bool phone_visible;
-} user_profile_access_t;
+} db_user_profile_access_t;
 
 typedef struct {
     uint64_t id;
     time_t created_at;
     time_t updated_at;
     uint64_t user_uid;
-} user_active_t;
+} db_user_active_t;
 
 typedef struct {
     char *username;
@@ -61,7 +54,7 @@ typedef struct {
     bool *phone_visible;
     bool *email_visible;
     char *password;
-} user_profile_update_t;
+} db_user_profile_update_t;
 
 typedef struct {
     uint64_t id;
@@ -77,7 +70,7 @@ typedef struct {
     char *phone;
     bool phone_visible;
     char *overview;
-} user_info_t;
+} db_user_info_t;
 
 typedef struct {
     uint64_t id;
@@ -88,7 +81,7 @@ typedef struct {
     char *last_message;
     time_t *last_message_date;
     uint16_t unread_message_count;
-} user_minimal_with_l_message_t;
+} db_user_minimal_with_l_message_t;
 
 typedef struct {
     uint64_t id;
@@ -99,44 +92,42 @@ typedef struct {
     char *username;
     char *email;
     bool email_confirm;
-} user_minimal_t;
+} db_user_minimal_t;
 /* ------------ */
 /* table. USERS */
 
 /* SQLs */
 /* Create user_core */
-db_result_t db_user_core_create(db_t* db, user_core_t* user);
+db_result_t db_user_core_create(db_t* db, db_user_core_t* user);
 /* Create user_profile */
-db_result_t db_user_profile_create(db_t* db, user_profile_t* user);
+db_result_t db_user_profile_create(db_t* db, db_user_profile_t* user);
 /* Create user_profile_access */
-db_result_t db_user_profile_access_create(db_t* db, user_profile_access_t* user);
+db_result_t db_user_profile_access_create(db_t* db, db_user_profile_access_t* user);
 /* Create user_profile_active */
-db_result_t db_user_profile_active_create(db_t* db, user_active_t* user);
+db_result_t db_user_profile_active_create(db_t* db, db_user_active_t* user);
 /* Create FULL user */
-db_result_t db_user_create(db_t* db, user_core_t* user_core, user_profile_t* user_profile, 
-                                user_profile_access_t* user_profile_access, user_active_t* user_active);
+db_result_t db_user_create(db_t* db, db_user_core_t* user_core, db_user_profile_t* user_profile, 
+                                db_user_profile_access_t* user_profile_access, db_user_active_t* user_active);
 /* Get user info by user_uid */
-user_info_t* db_user_info_get_by_uid(db_t* db, uint64_t user_uid);
+db_result_t db_user_info_get_by_uid(db_t* db, uint64_t user_uid, db_user_info_t** out_user);
 /* HELPER. Free user info */
-void db_user_info_free(user_info_t* user);
+void db_user_info_free(db_user_info_t* user);
 /* Get user_core by email */
-user_core_t* db_user_core_get_by_email(db_t* db, char *email);
-/* DB_OK and *out_user NULL means the email is not registered. */
-db_result_t db_user_core_lookup_by_email(db_t* db, char* email, user_core_t** out_user);
+db_result_t db_user_core_lookup_by_email(db_t* db, char* email, db_user_core_t** out_user);
 /* Get user_core by user_uid */
-user_core_t* db_user_core_get_by_uid(db_t* db, uint64_t user_uid);
+db_result_t db_user_core_get_by_uid(db_t* db, uint64_t user_uid, db_user_core_t** out_user);
 /* Update user email confirm by email */
 db_result_t db_user_core_upd_email_confirm(db_t* db, bool confirm, char* email);
 /* Update user profile avatar by user_uid*/
 db_result_t db_user_profile_upd_avatar_by_uid(db_t* db, uint64_t user_uid, char* avatar);
 /* Update user profile access by user_uid */
-db_result_t db_user_profile_access_upd_by_uid(db_t* db, uint64_t user_uid, user_profile_update_t* user);
+db_result_t db_user_profile_access_upd_by_uid(db_t* db, uint64_t user_uid, db_user_profile_update_t* user);
 /* Update user profile by user_uid */
-db_result_t db_user_profile_upd_by_uid(db_t* db, uint64_t user_uid, user_profile_update_t* user);
+db_result_t db_user_profile_upd_by_uid(db_t* db, uint64_t user_uid, db_user_profile_update_t* user);
 /* Update user core by user_uid */
-db_result_t db_user_core_upd_by_uid(db_t* db, uint64_t user_uid, user_profile_update_t* user);
+db_result_t db_user_core_upd_by_uid(db_t* db, uint64_t user_uid, db_user_profile_update_t* user);
 /* Update user UPDATE ALL by user_uid */
-db_result_t db_user_UPDATE_upd(db_t* db, uint64_t user_uid, user_profile_update_t* user);
+db_result_t db_user_UPDATE_upd(db_t* db, uint64_t user_uid, db_user_profile_update_t* user);
 /* Delete user by user_uid */
 db_result_t db_user_del_by_uid(db_t* db, uint64_t user_uid);
 

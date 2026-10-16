@@ -9,7 +9,7 @@
 
 typedef struct
 {
-    user_info_t* user;
+    db_user_info_t* user;
 } auth_token_t;
 
 /* Handler helper */

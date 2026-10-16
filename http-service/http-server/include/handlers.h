@@ -10,7 +10,7 @@
 
 typedef struct
 {
-    user_info_t* user;
+    db_user_info_t* user;
 } auth_token_t;
 
 /* Handler helper */
@@ -41,6 +41,13 @@ void media_upload_in_chat_handler_v2(chttpx_request_t* req, chttpx_response_t* r
 void group_chats_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res);
 void group_chats_edit_handler_v2(chttpx_request_t* req, chttpx_response_t* res);
 void group_chats_delete_handler_v2(chttpx_request_t* req, chttpx_response_t* res);
+
+/* Support handlers */
+void support_request_handler_v2(chttpx_request_t* req, chttpx_response_t* res);
+void support_get_tickets_handler_v2(chttpx_request_t* req, chttpx_response_t* res);
+void support_get_ticket_handler_v2(chttpx_request_t* req, chttpx_response_t* res);
+void support_answer_handler_v2(chttpx_request_t* req, chttpx_response_t* res);
+void support_append_description_handler_v2(chttpx_request_t* req, chttpx_response_t* res);
 
 /* Moderation handlers */
 void moderation_wtype_handler_v2(chttpx_request_t* req, chttpx_response_t* res);

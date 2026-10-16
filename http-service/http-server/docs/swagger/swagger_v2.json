@@ -1351,6 +1351,514 @@
           }
         }
       }
+    },
+    "/support/tickets": {
+      "post": {
+        "summary": "Create a support ticket",
+        "description": "Public. No bearer token. Anyone on the support site can open a ticket. Proof-of-work still applies (X-Debug: 1 skips it in development). The server joins first and last name, stores the email in lowercase, and sends an acknowledgment in Accept-Language. The email links to the site with the edit token. The 201 body is the only API response that includes that token. Later reads never return it. Keep the token: ticket ids are sequential, and the token is what proves this visitor owns the ticket.",
+        "tags": [
+          "Support"
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the response and the acknowledgment email",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupportRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Ticket created and acknowledgment email sent. message.token is the visitor edit token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportCreatedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Validation error or prohibited language",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error or email delivery failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Text moderation is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "List support tickets",
+        "description": "Staff only. Requires a bearer token. Visitors cannot list tickets. Returns 15 tickets per page, oldest first (created_at, then id). offset is how many rows to skip, not a page number: offset=0 is tickets 1-15, offset=15 is 16-30. There is no limit parameter. An empty page is { \"message\": [] }. The edit token is never included. data_updated is true when the visitor has appended text since the last staff reply.",
+        "tags": [
+          "Support"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Response language from the server",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Rows to skip. Page size is fixed at 15.",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "default": 0,
+              "example": 15
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of tickets",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketsResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid offset",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/support/tickets/{ticket_id}": {
+      "get": {
+        "summary": "Get one support ticket",
+        "description": "Same path for the visitor and for staff. Who is calling is decided by the query, not by a different URL. Visitor: pass token, the 64-character lowercase hex edit token from create or from the email link (http://localhost:5173/support/{ticket_id}?token=). Do not send a bearer token. The ticket is returned only when ticket_id and token match. A wrong token is 404, the same as a missing ticket, so the id alone does not confirm that a ticket exists. A token that is not exactly 64 lowercase hex characters is 400. Staff: omit token and send a bearer token. The ticket is loaded by id, including answer, status, assigned_to, and data_updated. The edit token is not in the JSON in either case.",
+        "tags": [
+          "Support"
+        ],
+        "security": [
+          {},
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Response language from the server",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          },
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "description": "Public ticket id, YYMMDD-NNNNNN. 1 to 32 characters.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32,
+              "example": "261016-000001"
+            }
+          },
+          {
+            "name": "token",
+            "in": "query",
+            "required": false,
+            "description": "Visitor edit token. Required for an unauthenticated read. Omit it when calling as staff with a bearer token.",
+            "schema": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}$",
+              "example": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The ticket. Does not include the edit token.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ticket id, or a token that is not 64 lowercase hex characters",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "No token query and the bearer token is missing or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ticket not found, or the visitor token does not match this ticket",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Append information to a ticket",
+        "description": "Visitor only. No bearer token. Use this when support asked for missing details. The caller proves ownership with the edit token in the JSON body, not with a query parameter. The new text is appended to description after a blank line; the previous text stays. data_updated becomes true so staff can see that new information arrived. A wrong token is 404, the same as a missing ticket. This route does not change answer, status, or assigned_to.",
+        "tags": [
+          "Support"
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Response language from the server",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          },
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "description": "Public ticket id, YYMMDD-NNNNNN. 1 to 32 characters.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32,
+              "example": "261016-000001"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupportAppend"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Description appended and data_updated set to true",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ticket id, malformed token, validation error, or prohibited language",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ticket not found, or the token does not match this ticket",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Text moderation is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/support/tickets/{ticket_id}/answer": {
+      "patch": {
+        "summary": "Reply to a support ticket",
+        "description": "Staff only. Requires a bearer token. The visitor cannot set the reply. The body is only the answer text; status is not accepted from the client. The server stores the answer, forces status to in_progress, sets assigned_to to the signed-in user, and sets data_updated to false. Status is never set to closed here. The reply is emailed to the address on the ticket, in Accept-Language, with a link back to the site that includes the visitor edit token. If that email fails after the ticket was saved, the response is 500 and the ticket is already updated.",
+        "tags": [
+          "Support"
+        ],
+        "security": [
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "X-Debug",
+            "in": "header",
+            "description": "Enabled dev mode (example skip PoW security)",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "1"
+            }
+          },
+          {
+            "name": "Accept-Language",
+            "in": "header",
+            "description": "Language of the response and the reply email",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "example": "en"
+            }
+          },
+          {
+            "name": "ticket_id",
+            "in": "path",
+            "required": true,
+            "description": "Public ticket id, YYMMDD-NNNNNN. 1 to 32 characters.",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 32,
+              "example": "261016-000001"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SupportAnswer"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Answer saved, status set to in_progress, and the reply email sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportTicketResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ticket id, validation error, or prohibited language",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Missing or invalid bearer token",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ticket not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error, or the reply was saved but the email failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Text moderation is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1631,6 +2139,226 @@
             "type": "string",
             "minLength": 0,
             "maxLength": 3000
+          }
+        }
+      },
+      "SupportRequest": {
+        "type": "object",
+        "required": [
+          "first_name",
+          "last_name",
+          "email",
+          "subject",
+          "description"
+        ],
+        "properties": {
+          "first_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 96,
+            "description": "Given name. UTF-8, no control characters",
+            "example": "Ivan"
+          },
+          "last_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 96,
+            "description": "Family name. UTF-8, no control characters",
+            "example": "Petrov"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "minLength": 5,
+            "maxLength": 254,
+            "description": "Address that receives the acknowledgment. Stored lowercased",
+            "example": "ivan@example.com"
+          },
+          "subject": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "example": "Cannot sign in"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "example": "The login page returns an error after I enter my email."
+          }
+        }
+      },
+      "SupportCreatedResponse": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "object",
+            "required": [
+              "ticket_id",
+              "token"
+            ],
+            "properties": {
+              "ticket_id": {
+                "type": "string",
+                "description": "Public ticket id, YYMMDD and a 6-digit number",
+                "example": "261016-000001"
+              },
+              "token": {
+                "type": "string",
+                "description": "Visitor edit token, 64 lowercase hex characters. Returned only here. Pass it as ?token= to read the ticket, and in the body to append text.",
+                "minLength": 64,
+                "maxLength": 64,
+                "example": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+              }
+            }
+          }
+        }
+      },
+      "SupportTicket": {
+        "type": "object",
+        "required": [
+          "id",
+          "created_at",
+          "updated_at",
+          "ticket_id",
+          "email",
+          "name",
+          "subject",
+          "description",
+          "status",
+          "assigned_to",
+          "answer",
+          "data_updated"
+        ],
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Internal row id",
+            "example": 1
+          },
+          "created_at": {
+            "type": "integer",
+            "description": "Unix timestamp",
+            "example": 1760563200
+          },
+          "updated_at": {
+            "type": "integer",
+            "description": "Unix timestamp",
+            "example": 1760563200
+          },
+          "ticket_id": {
+            "type": "string",
+            "example": "261016-000001"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "ivan@example.com"
+          },
+          "name": {
+            "type": "string",
+            "description": "First and last name joined by a space",
+            "example": "Ivan Petrov"
+          },
+          "subject": {
+            "type": "string",
+            "example": "Cannot sign in"
+          },
+          "description": {
+            "type": "string",
+            "description": "Original text, plus any later visitor additions separated by a blank line"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "open",
+              "in_progress",
+              "closed"
+            ],
+            "description": "open on create. A staff reply sets in_progress. This API does not set closed."
+          },
+          "assigned_to": {
+            "type": "integer",
+            "format": "int64",
+            "description": "User id of the staff member who answered. 0 when nobody is assigned.",
+            "example": 0
+          },
+          "answer": {
+            "type": "string",
+            "description": "Latest staff reply. Empty until support answers."
+          },
+          "data_updated": {
+            "type": "boolean",
+            "description": "True after the visitor appends text. A staff reply sets it back to false.",
+            "example": false
+          }
+        }
+      },
+      "SupportTicketResponse": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/SupportTicket"
+          }
+        }
+      },
+      "SupportTicketsResponse": {
+        "type": "object",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupportTicket"
+            }
+          }
+        }
+      },
+      "SupportAppend": {
+        "type": "object",
+        "required": [
+          "token",
+          "description"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "minLength": 64,
+            "maxLength": 64,
+            "pattern": "^[0-9a-f]{64}$",
+            "description": "Edit token from the create response or the email link",
+            "example": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "Text to append. It does not replace the existing description.",
+            "example": "The error code is 403."
+          }
+        }
+      },
+      "SupportAnswer": {
+        "type": "object",
+        "required": [
+          "answer"
+        ],
+        "properties": {
+          "answer": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 4000,
+            "description": "Reply shown to the visitor and sent by email. Do not send status.",
+            "example": "Please send the exact error text from the login page."
           }
         }
       }

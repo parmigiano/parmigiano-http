@@ -14,85 +14,85 @@ services:
     #     volumes:
     #         - ollama_phi_data:/root/.ollama
 
-    libretranslate:
-        image: libretranslate/libretranslate
-        restart: unless-stopped
-        ports:
-            - '4512:5000'
-        environment:
-            - LT_LOAD_ONLY=en,ru
-        volumes:
-            - lt_data:/app/models
-        networks:
-            parmigiano:
-                aliases:
-                    - libretranslate
-        security_opt:
-            - no-new-privileges:true
-        logging:
-            driver: json-file
-            options:
-                max-size: '10m'
-                max-file: '3'
+    # libretranslate:
+    #     image: libretranslate/libretranslate
+    #     restart: unless-stopped
+    #     ports:
+    #         - '4512:5000'
+    #     environment:
+    #         - LT_LOAD_ONLY=en,ru
+    #     volumes:
+    #         - lt_data:/app/models
+    #     networks:
+    #         parmigiano:
+    #             aliases:
+    #                 - libretranslate
+    #     security_opt:
+    #         - no-new-privileges:true
+    #     logging:
+    #         driver: json-file
+    #         options:
+    #             max-size: '10m'
+    #             max-file: '3'
 
-    nsfw:
-        restart: unless-stopped
-        build:
-            context: ./nsfw-service
-            dockerfile: Dockerfile
-        environment:
-            PORT: '9090'
-            NSFW_THRESHOLD_PORN: '0.6'
-            NSFW_THRESHOLD_HENTAI: '0.6'
-            NSFW_THRESHOLD_SEXY: '0.8'
-        ports:
-            - '9090:9090'
-        networks:
-            parmigiano:
-                aliases:
-                    - nsfw
-        security_opt:
-            - no-new-privileges:true
-        logging:
-            driver: json-file
-            options:
-                max-size: '10m'
-                max-file: '3'
-        healthcheck:
-            test: ['CMD', 'node', 'healthcheck.js']
-            interval: 5s
-            timeout: 3s
-            retries: 12
-            start_period: 40s
+    # nsfw:
+    #     restart: unless-stopped
+    #     build:
+    #         context: ./nsfw-service
+    #         dockerfile: Dockerfile
+    #     environment:
+    #         PORT: '9090'
+    #         NSFW_THRESHOLD_PORN: '0.6'
+    #         NSFW_THRESHOLD_HENTAI: '0.6'
+    #         NSFW_THRESHOLD_SEXY: '0.8'
+    #     ports:
+    #         - '9090:9090'
+    #     networks:
+    #         parmigiano:
+    #             aliases:
+    #                 - nsfw
+    #     security_opt:
+    #         - no-new-privileges:true
+    #     logging:
+    #         driver: json-file
+    #         options:
+    #             max-size: '10m'
+    #             max-file: '3'
+    #     healthcheck:
+    #         test: ['CMD', 'node', 'healthcheck.js']
+    #         interval: 5s
+    #         timeout: 3s
+    #         retries: 12
+    #         start_period: 40s
 
-    profanity:
-        restart: unless-stopped
-        build:
-            context: ./profanity-service
-            dockerfile: Dockerfile
-        environment:
-            PORT: '9191'
-            PROFANITY_LANGUAGES: 'en,ru,de,sp'
-            PROFANITY_MATCH_THRESHOLD: '0.95'
-        ports:
-            - '9191:9191'
-        networks:
-            parmigiano:
-                aliases:
-                    - profanity
-        security_opt:
-            - no-new-privileges:true
-        logging:
-            driver: json-file
-            options:
-                max-size: '10m'
-                max-file: '3'
-        healthcheck:
-            test: ['CMD', 'python', 'healthcheck.py']
-            interval: 5s
-            timeout: 3s
-            retries: 12
-            start_period: 15s
+    # profanity:
+    #     restart: unless-stopped
+    #     build:
+    #         context: ./profanity-service
+    #         dockerfile: Dockerfile
+    #     environment:
+    #         PORT: '9191'
+    #         PROFANITY_LANGUAGES: 'en,ru,de,sp'
+    #         PROFANITY_MATCH_THRESHOLD: '0.95'
+    #     ports:
+    #         - '9191:9191'
+    #     networks:
+    #         parmigiano:
+    #             aliases:
+    #                 - profanity
+    #     security_opt:
+    #         - no-new-privileges:true
+    #     logging:
+    #         driver: json-file
+    #         options:
+    #             max-size: '10m'
+    #             max-file: '3'
+    #     healthcheck:
+    #         test: ['CMD', 'python', 'healthcheck.py']
+    #         interval: 5s
+    #         timeout: 3s
+    #         retries: 12
+    #         start_period: 15s
 
     http_server:
         restart: always

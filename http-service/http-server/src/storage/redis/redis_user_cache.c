@@ -78,7 +78,7 @@ static int read_opt_string(cJSON* root, const char* name, char** out)
     return *out != NULL;
 }
 
-static char* user_to_json(const user_info_t* user)
+static char* user_to_json(const db_user_info_t* user)
 {
     cJSON* root = cJSON_CreateObject();
     if (!root)
@@ -101,7 +101,7 @@ static char* user_to_json(const user_info_t* user)
     return json;
 }
 
-static int json_to_user(const char* json, user_info_t* user)
+static int json_to_user(const char* json, db_user_info_t* user)
 {
     cJSON* root = cJSON_Parse(json);
     if (!root)
@@ -118,7 +118,7 @@ static int json_to_user(const char* json, user_info_t* user)
     return ok;
 }
 
-int redis_user_info_get(uint64_t user_uid, user_info_t** out)
+int redis_user_info_get(uint64_t user_uid, db_user_info_t** out)
 {
     if (!out)
         return -1;
@@ -147,7 +147,7 @@ int redis_user_info_get(uint64_t user_uid, user_info_t** out)
         return -1;
     }
 
-    user_info_t* user = calloc(1, sizeof(*user));
+    db_user_info_t* user = calloc(1, sizeof(*user));
     if (!user)
     {
         freeReplyObject(reply);
@@ -167,7 +167,7 @@ int redis_user_info_get(uint64_t user_uid, user_info_t** out)
     return 1;
 }
 
-int redis_user_info_set(const user_info_t* user)
+int redis_user_info_set(const db_user_info_t* user)
 {
     if (!user)
         return -1;
@@ -210,7 +210,7 @@ int redis_user_info_delete(uint64_t user_uid)
     return ok ? 0 : -1;
 }
 
-static int block_cache_ttl(const user_block_t* block)
+static int block_cache_ttl(const db_user_block_t* block)
 {
     if (!block || block->permanent || block->blocked_until <= 0)
         return REDIS_USER_BLOCK_TTL;
@@ -224,7 +224,7 @@ static int block_cache_ttl(const user_block_t* block)
     return (int)left;
 }
 
-static void block_cache_value(const user_block_t* block, char* value, size_t len)
+static void block_cache_value(const db_user_block_t* block, char* value, size_t len)
 {
     if (!block || (!block->permanent && block->blocked_until > 0 && block->blocked_until <= time(NULL)))
     {
@@ -299,7 +299,7 @@ int redis_user_block_get(uint64_t user_uid, int* out_blocked)
     return parsed ? 1 : 0;
 }
 
-int redis_user_block_set(uint64_t user_uid, const user_block_t* block)
+int redis_user_block_set(uint64_t user_uid, const db_user_block_t* block)
 {
     char* key = cache_key("user_block:", user_uid);
     if (!key)

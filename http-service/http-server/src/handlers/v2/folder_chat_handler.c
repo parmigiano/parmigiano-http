@@ -33,7 +33,7 @@ typedef struct
 static db_result_t group_chat_create_tx(db_t* db, void* arg)
 {
     group_chat_tx_t* tx = arg;
-    chat_group_t group = {.user_uid = tx->user_uid, .name = tx->name};
+    db_chat_group_t group = {.user_uid = tx->user_uid, .name = tx->name};
 
     db_result_t result = db_group_chat_create(db, &group, &tx->group_id);
     if (result != DB_OK)

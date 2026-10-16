@@ -3,7 +3,7 @@
 
 #include "logger.h"
 
-db_result_t db_user_core_create(db_t* db, user_core_t* user)
+db_result_t db_user_core_create(db_t* db, db_user_core_t* user)
 {
     const char* query = "INSERT INTO user_cores (user_uid, email, password, email_confirm) VALUES ($1, $2, $3, $4)";
 
@@ -24,7 +24,7 @@ db_result_t db_user_core_create(db_t* db, user_core_t* user)
     return result;
 }
 
-db_result_t db_user_profile_create(db_t* db, user_profile_t* user)
+db_result_t db_user_profile_create(db_t* db, db_user_profile_t* user)
 {
     const char* query = "INSERT INTO user_profiles (user_uid, avatar, name, username) VALUES ($1, $2, $3, $4)";
 
@@ -43,7 +43,7 @@ db_result_t db_user_profile_create(db_t* db, user_profile_t* user)
     return result;
 }
 
-db_result_t db_user_profile_access_create(db_t* db, user_profile_access_t* user)
+db_result_t db_user_profile_access_create(db_t* db, db_user_profile_access_t* user)
 {
     const char* query = "INSERT INTO user_profile_accesses (user_uid, email_visible, "
                         "username_visible, phone_visible) VALUES ($1, $2, $3, $4)";
@@ -65,7 +65,7 @@ db_result_t db_user_profile_access_create(db_t* db, user_profile_access_t* user)
     return result;
 }
 
-db_result_t db_user_profile_active_create(db_t* db, user_active_t* user)
+db_result_t db_user_profile_active_create(db_t* db, db_user_active_t* user)
 {
     const char* query = "INSERT INTO user_actives (user_uid) VALUES ($1)";
 
@@ -87,10 +87,10 @@ db_result_t db_user_profile_active_create(db_t* db, user_active_t* user)
 
 typedef struct
 {
-    user_core_t* user_core;
-    user_profile_t* user_profile;
-    user_profile_access_t* user_profile_access;
-    user_active_t* user_active;
+    db_user_core_t* user_core;
+    db_user_profile_t* user_profile;
+    db_user_profile_access_t* user_profile_access;
+    db_user_active_t* user_active;
 } db_user_create_args_t;
 
 static db_result_t db_user_create_tx(db_t* db, void* arg)
@@ -113,8 +113,8 @@ static db_result_t db_user_create_tx(db_t* db, void* arg)
     return db_user_profile_active_create(db, args->user_active);
 }
 
-db_result_t db_user_create(db_t* db, user_core_t* user_core, user_profile_t* user_profile, user_profile_access_t* user_profile_access,
-                           user_active_t* user_active)
+db_result_t db_user_create(db_t* db, db_user_core_t* user_core, db_user_profile_t* user_profile, db_user_profile_access_t* user_profile_access,
+                           db_user_active_t* user_active)
 {
     db_user_create_args_t args = {
         .user_core = user_core,
@@ -130,8 +130,12 @@ db_result_t db_user_create(db_t* db, user_core_t* user_core, user_profile_t* use
     return rc;
 }
 
-user_info_t* db_user_info_get_by_uid(db_t* db, uint64_t user_uid)
+db_result_t db_user_info_get_by_uid(db_t* db, uint64_t user_uid, db_user_info_t** out_user)
 {
+    if (!db || !out_user || !user_uid)
+        return DB_ERROR;
+
+    *out_user = NULL;
     db_result_set_t* rc = NULL;
 
     const char* query = "SELECT\n"
@@ -165,16 +169,16 @@ user_info_t* db_user_info_get_by_uid(db_t* db, uint64_t user_uid)
     {
         logger_error("db_user_info_get_by_uid user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
         free_result_set(rc);
-        return NULL;
+        return result;
     }
 
     if (!rc || rc->n_rows == 0)
     {
         free_result_set(rc);
-        return NULL;
+        return DB_OK;
     }
 
-    user_info_t* user = malloc(sizeof(user_info_t));
+    db_user_info_t* user = malloc(sizeof(db_user_info_t));
     if (!user)
     {
         logger_error("db_user_info_get_by_uid user_uid={%lu}: calloc failed for user", user_uid);
@@ -182,10 +186,10 @@ user_info_t* db_user_info_get_by_uid(db_t* db, uint64_t user_uid)
         fprintf(stderr, "malloc failed\n");
 
         free_result_set(rc);
-        return NULL;
+        return DB_ERROR;
     }
 
-    memset(user, 0, sizeof(user_info_t));
+    memset(user, 0, sizeof(db_user_info_t));
 
     user->id = strtoull(rc->rows[0].columns[0], NULL, 10);
     user->created_at = parse_pg_timestamp(rc->rows[0].columns[1]);
@@ -203,10 +207,11 @@ user_info_t* db_user_info_get_by_uid(db_t* db, uint64_t user_uid)
 
     free_result_set(rc);
 
-    return user;
+    *out_user = user;
+    return DB_OK;
 }
 
-void db_user_info_free(user_info_t* user)
+void db_user_info_free(db_user_info_t* user)
 {
     if (!user)
         return;
@@ -221,14 +226,7 @@ void db_user_info_free(user_info_t* user)
     free(user);
 }
 
-user_core_t* db_user_core_get_by_email(db_t* db, char* email)
-{
-    user_core_t* user = NULL;
-    db_user_core_lookup_by_email(db, email, &user);
-    return user;
-}
-
-db_result_t db_user_core_lookup_by_email(db_t* db, char* email, user_core_t** out_user)
+db_result_t db_user_core_lookup_by_email(db_t* db, char* email, db_user_core_t** out_user)
 {
     db_result_set_t* rc = NULL;
 
@@ -252,7 +250,7 @@ db_result_t db_user_core_lookup_by_email(db_t* db, char* email, user_core_t** ou
         return DB_OK;
     }
 
-    user_core_t* user = malloc(sizeof(user_core_t));
+    db_user_core_t* user = malloc(sizeof(db_user_core_t));
     if (!user)
     {
         logger_error("db_user_core_get_by_email email={%s}: calloc failed for user", email);
@@ -263,7 +261,7 @@ db_result_t db_user_core_lookup_by_email(db_t* db, char* email, user_core_t** ou
         return DB_ERROR;
     }
 
-    memset(user, 0, sizeof(user_core_t));
+    memset(user, 0, sizeof(db_user_core_t));
 
     user->id = strtoull(rc->rows[0].columns[0], NULL, 10);
     user->created_at = parse_pg_timestamp(rc->rows[0].columns[1]);
@@ -288,8 +286,12 @@ db_result_t db_user_core_lookup_by_email(db_t* db, char* email, user_core_t** ou
     return DB_OK;
 }
 
-user_core_t* db_user_core_get_by_uid(db_t* db, uint64_t user_uid)
+db_result_t db_user_core_get_by_uid(db_t* db, uint64_t user_uid, db_user_core_t** out_user)
 {
+    if (!db || !out_user || !user_uid)
+        return DB_ERROR;
+
+    *out_user = NULL;
     db_result_set_t* rc = NULL;
 
     const char* query = "SELECT id, user_uid, email, email_confirm, password FROM user_cores "
@@ -306,16 +308,16 @@ user_core_t* db_user_core_get_by_uid(db_t* db, uint64_t user_uid)
     {
         logger_error("db_user_core_get_by_uid user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
         free_result_set(rc);
-        return NULL;
+        return result;
     }
 
     if (!rc || rc->n_rows == 0)
     {
         free_result_set(rc);
-        return NULL;
+        return DB_OK;
     }
 
-    user_core_t* user = malloc(sizeof(user_core_t));
+    db_user_core_t* user = malloc(sizeof(db_user_core_t));
     if (!user)
     {
         logger_error("db_user_core_get_by_uid user_uid={%lu}: malloc failed for user", user_uid);
@@ -323,10 +325,10 @@ user_core_t* db_user_core_get_by_uid(db_t* db, uint64_t user_uid)
         fprintf(stderr, "malloc failed\n");
 
         free_result_set(rc);
-        return NULL;
+        return DB_ERROR;
     }
 
-    memset(user, 0, sizeof(user_core_t));
+    memset(user, 0, sizeof(db_user_core_t));
 
     user->id = strtoull(rc->rows[0].columns[0], NULL, 10);
     user->user_uid = strtoull(rc->rows[0].columns[1], NULL, 10);
@@ -336,7 +338,8 @@ user_core_t* db_user_core_get_by_uid(db_t* db, uint64_t user_uid)
 
     free_result_set(rc);
 
-    return user;
+    *out_user = user;
+    return DB_OK;
 }
 
 db_result_t db_user_core_upd_email_confirm(db_t* db, bool confirm, char* email)
@@ -372,7 +375,7 @@ db_result_t db_user_profile_upd_avatar_by_uid(db_t* db, uint64_t user_uid, char*
     return result;
 }
 
-db_result_t db_user_profile_access_upd_by_uid(db_t* db, uint64_t user_uid, user_profile_update_t* user)
+db_result_t db_user_profile_access_upd_by_uid(db_t* db, uint64_t user_uid, db_user_profile_update_t* user)
 {
     char query[512];
     const char* params[5];
@@ -422,7 +425,7 @@ db_result_t db_user_profile_access_upd_by_uid(db_t* db, uint64_t user_uid, user_
     return result;
 }
 
-db_result_t db_user_profile_upd_by_uid(db_t* db, uint64_t user_uid, user_profile_update_t* user)
+db_result_t db_user_profile_upd_by_uid(db_t* db, uint64_t user_uid, db_user_profile_update_t* user)
 {
     char query[512];
     const char* params[6];
@@ -479,7 +482,7 @@ db_result_t db_user_profile_upd_by_uid(db_t* db, uint64_t user_uid, user_profile
     return result;
 }
 
-db_result_t db_user_core_upd_by_uid(db_t* db, uint64_t user_uid, user_profile_update_t* user)
+db_result_t db_user_core_upd_by_uid(db_t* db, uint64_t user_uid, db_user_profile_update_t* user)
 {
     char query[512];
     const char* params[4];
@@ -525,7 +528,7 @@ db_result_t db_user_core_upd_by_uid(db_t* db, uint64_t user_uid, user_profile_up
 typedef struct
 {
     uint64_t user_uid;
-    user_profile_update_t* user;
+    db_user_profile_update_t* user;
 } db_user_update_args_t;
 
 static db_result_t db_user_update_tx(db_t* db, void* arg)
@@ -544,7 +547,7 @@ static db_result_t db_user_update_tx(db_t* db, void* arg)
     return db_user_profile_access_upd_by_uid(db, args->user_uid, args->user);
 }
 
-db_result_t db_user_UPDATE_upd(db_t* db, uint64_t user_uid, user_profile_update_t* user)
+db_result_t db_user_UPDATE_upd(db_t* db, uint64_t user_uid, db_user_profile_update_t* user)
 {
     if (!db)
         return DB_ERROR;

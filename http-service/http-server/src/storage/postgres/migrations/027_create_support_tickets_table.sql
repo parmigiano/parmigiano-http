@@ -3,18 +3,22 @@ CREATE TABLE IF NOT EXISTS support_tickets (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     ticket_id VARCHAR(32) NOT NULL UNIQUE,
-    user_uid BIGINT NOT NULL REFERENCES user_cores(user_uid) ON DELETE CASCADE,
-    email VARCHAR(100) NOT NULL REFERENCES user_cores(email) ON DELETE CASCADE,
+    email VARCHAR(254) NOT NULL,
+    name VARCHAR(193) NOT NULL,
     subject VARCHAR(255) NOT NULL,
     description TEXT NOT NULL,
     status VARCHAR(20) NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'closed')),
-    assigned_to BIGINT REFERENCES user_cores(user_uid) ON DELETE SET NULL
+    assigned_to BIGINT REFERENCES user_cores(user_uid) ON DELETE SET NULL,
+    answer TEXT NULL,
+    data_updated BOOLEAN NOT NULL DEFAULT FALSE,
+    edit_token VARCHAR(64) NOT NULL
 );
 
 CREATE OR REPLACE FUNCTION set_support_ticket_id()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.ticket_id := to_char(NEW.created_at AT TIME ZONE 'UTC', 'YYMMDD') || '-' || lpad(NEW.id::TEXT, 6, '0');
+    NEW.edit_token := replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', '');
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;

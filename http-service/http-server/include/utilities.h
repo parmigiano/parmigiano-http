@@ -23,6 +23,15 @@ char* escape_json_string(const char* input);
 void trim_space(char *str);
 bool is_valid(const char *str);
 void to_lower(char *str);
+char* html_escape(const char* src);
+
+/* time.c */
+void utc_timestamp(char* buffer, size_t size);
+
+/* html.c */
+char* html_wrap(const char* title, const char* content, const char* terms, const char* language);
+char* html_support_letter(const char* language, const char* subject, const char* ticket_id, const char* name, const char* description, const char* edit_token);
+char* html_support_answer_letter(const char* language, const char* ticket_id, const char* answer, const char* edit_token);
 
 /* password.c */
 char* hash_password(const char *password);

@@ -22,7 +22,7 @@ typedef struct
     char* message;
 } chat_bot_ai_t;
 
-static chttpx_response_t chat_preview_response(chttpx_request_t* req, const chat_preview_LIST_t* chats)
+static chttpx_response_t chat_preview_response(chttpx_request_t* req, const db_chat_preview_LIST_t* chats)
 {
     chttpx_json_t* root = cHTTPX_JsonObject(req);
     chttpx_json_t* message = cHTTPX_JsonArray(req);
@@ -34,7 +34,7 @@ static chttpx_response_t chat_preview_response(chttpx_request_t* req, const chat
     {
         for (size_t i = 0; i < chats->count; ++i)
         {
-            const chat_preview_t* chat = &chats->items[i];
+            const db_chat_preview_t* chat = &chats->items[i];
             chttpx_json_t* item = cHTTPX_JsonObject(req);
 
             if (!item || cHTTPX_JsonNumber(item, "id", (double)chat->id) != 0 || cHTTPX_JsonString(item, "name", chat->name) != 0 ||
@@ -55,7 +55,7 @@ static chttpx_response_t chat_preview_response(chttpx_request_t* req, const chat
     return cHTTPX_ResJsonObject(cHTTPX_StatusOK, root);
 }
 
-static chttpx_response_t chat_setting_response(chttpx_request_t* req, const chat_setting_t* setting)
+static chttpx_response_t chat_setting_response(chttpx_request_t* req, const db_chat_setting_t* setting)
 {
     chttpx_json_t* root = cHTTPX_JsonObject(req);
     chttpx_json_t* message = cHTTPX_JsonObject(req);
@@ -74,7 +74,7 @@ static chttpx_response_t chat_setting_response(chttpx_request_t* req, const chat
     return cHTTPX_ResJsonObject(cHTTPX_StatusOK, root);
 }
 
-static void chat_preview_list_free(chat_preview_LIST_t* chats)
+static void chat_preview_list_free(db_chat_preview_LIST_t* chats)
 {
     if (!chats)
         return;
@@ -107,7 +107,11 @@ void chat_get_my_history_handler_v2(chttpx_request_t* req, chttpx_response_t* re
     }
     size_t offset = (size_t)offset_value;
 
-    chat_preview_LIST_t* chats_preview = db_chat_get_my_history(app_context->db, ctx->user->user_uid, offset);
+    db_chat_preview_LIST_t* chats_preview = NULL;
+    db_result_t history_result = db_chat_get_my_history(app_context->db, ctx->user->user_uid, offset, &chats_preview);
+    if (db_reply_result(req, res, history_result))
+        return;
+
     *res = chat_preview_response(req, chats_preview);
     chat_preview_list_free(chats_preview);
 }
@@ -123,7 +127,11 @@ void chat_get_by_username_handler_v2(chttpx_request_t* req, chttpx_response_t* r
 
     const char* username_param = cHTTPX_Param(req, "username");
 
-    chat_preview_LIST_t* chats_preview = db_chat_get_by_username(app_context->db, ctx->user->user_uid, username_param);
+    db_chat_preview_LIST_t* chats_preview = NULL;
+    db_result_t username_result = db_chat_get_by_username(app_context->db, ctx->user->user_uid, username_param, &chats_preview);
+    if (db_reply_result(req, res, username_result))
+        return;
+
     *res = chat_preview_response(req, chats_preview);
     chat_preview_list_free(chats_preview);
 }
@@ -138,7 +146,7 @@ void chat_get_settings_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     }
 
     /* DB. get chat setting */
-    chat_setting_t* chat_setting = NULL;
+    db_chat_setting_t* chat_setting = NULL;
 
     uint64_t chat_id = 0;
     if (!cHTTPX_ParamU64(req, "chat_id", &chat_id))
@@ -154,7 +162,10 @@ void chat_get_settings_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         goto cleanup;
     }
 
-    chat_setting = db_chat_get_setting_by_chat_id(app_context->db, chat_id);
+    db_result_t setting_result = db_chat_get_setting_by_chat_id(app_context->db, chat_id, &chat_setting);
+    if (db_reply_result(req, res, setting_result))
+        goto cleanup;
+
     if (!chat_setting)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusNotFound, cHTTPX_i18n_t("error.chat-setting-not-found", req->language));
@@ -185,7 +196,7 @@ void chat_upload_custom_bg_handler_v2(chttpx_request_t* req, chttpx_response_t* 
     }
 
     /* db. get chat_setting */
-    chat_setting_t* chat_setting = NULL;
+    db_chat_setting_t* chat_setting = NULL;
     /* Initial URL avatar */
     char* url = NULL;
     const chttpx_file_t* file = cHTTPX_RequestFile(req);
@@ -220,7 +231,10 @@ void chat_upload_custom_bg_handler_v2(chttpx_request_t* req, chttpx_response_t* 
         goto cleanup;
     }
 
-    chat_setting = db_chat_get_setting_by_chat_id(app_context->db, chat_id);
+    db_result_t setting_result = db_chat_get_setting_by_chat_id(app_context->db, chat_id, &chat_setting);
+    if (db_reply_result(req, res, setting_result))
+        goto cleanup;
+
     if (!chat_setting)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusNotFound, cHTTPX_i18n_t("error.chat-setting-not-found", req->language));

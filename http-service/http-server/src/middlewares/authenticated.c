@@ -32,10 +32,16 @@ chttpx_middleware_result_t authenticate_middleware(chttpx_request_t* req, chttpx
     free(session);
     session = NULL;
 
-    user_info_t* user = NULL;
+    db_user_info_t* user = NULL;
     if (redis_user_info_get(user_uid, &user) != 1)
     {
-        user = db_user_info_get_by_uid(app_context->db, user_uid);
+        db_result_t user_result = db_user_info_get_by_uid(app_context->db, user_uid, &user);
+        if (user_result != DB_OK)
+        {
+            *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
+            return out;
+        }
+
         if (!user)
         {
             *res = cHTTPX_ResError(cHTTPX_StatusUnauthorized, cHTTPX_i18n_t("error.connect-to-account", req->language));
@@ -48,7 +54,7 @@ chttpx_middleware_result_t authenticate_middleware(chttpx_request_t* req, chttpx
     int blocked = 0;
     if (redis_user_block_get(user_uid, &blocked) != 1)
     {
-        user_block_t* block = NULL;
+        db_user_block_t* block = NULL;
 
         db_result_t block_result = db_user_block_get_active(app_context->db, user_uid, &block);
         if (block_result != DB_OK)

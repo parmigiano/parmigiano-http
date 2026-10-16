@@ -3,7 +3,7 @@
 
 #include "logger.h"
 
-db_result_t db_chat_create(db_t* db, chat_t* chat, uint64_t* out_chat_id)
+db_result_t db_chat_create(db_t* db, db_chat_t* chat, uint64_t* out_chat_id)
 {
     const char* query = "INSERT INTO chats (chat_type, title, description) VALUES ($1, $2, $3) RETURNING id";
     const char* params[3] = {chat->chat_type, chat->title, chat->description ? chat->description : ""};
@@ -49,7 +49,7 @@ db_result_t db_chat_create(db_t* db, chat_t* chat, uint64_t* out_chat_id)
     }
 }
 
-db_result_t db_chat_create_members(db_t* db, uint64_t chat_id, chat_member_t* members, size_t members_count)
+db_result_t db_chat_create_members(db_t* db, uint64_t chat_id, db_chat_member_t* members, size_t members_count)
 {
     const char* query = "INSERT INTO chat_members (chat_id, user_uid, role) SELECT $1, u, r FROM unnest($2::bigint[], $3::text[]) AS t(u, r)";
 
@@ -92,7 +92,7 @@ db_result_t db_chat_create_members(db_t* db, uint64_t chat_id, chat_member_t* me
     return result;
 }
 
-db_result_t db_chat_create_setting(db_t* db, uint64_t chat_id, chat_setting_t* setting)
+db_result_t db_chat_create_setting(db_t* db, uint64_t chat_id, db_chat_setting_t* setting)
 {
     const char* query = "INSERT INTO chat_settings (chat_id) VALUES ($1)";
 
@@ -113,10 +113,10 @@ db_result_t db_chat_create_setting(db_t* db, uint64_t chat_id, chat_setting_t* s
 
 typedef struct
 {
-    chat_t* chat;
-    chat_member_t* members;
+    db_chat_t* chat;
+    db_chat_member_t* members;
     size_t members_count;
-    chat_setting_t* setting;
+    db_chat_setting_t* setting;
     uint64_t chat_id;
 } db_chat_create_all_args_t;
 
@@ -134,7 +134,7 @@ static db_result_t db_chat_create_all_tx(db_t* db, void* arg)
     return db_chat_create_members(db, args->chat_id, args->members, args->members_count);
 }
 
-db_result_t db_chat_create_all(db_t* db, chat_t* chat, chat_member_t* members, size_t members_count, chat_setting_t* setting, uint64_t* out_chat_id)
+db_result_t db_chat_create_all(db_t* db, db_chat_t* chat, db_chat_member_t* members, size_t members_count, db_chat_setting_t* setting, uint64_t* out_chat_id)
 {
     db_chat_create_all_args_t args = {
         .chat = chat,
@@ -157,8 +157,12 @@ db_result_t db_chat_create_all(db_t* db, chat_t* chat, chat_member_t* members, s
     return DB_OK;
 }
 
-chat_preview_LIST_t* db_chat_get_my_history(db_t* db, uint64_t user_uid, size_t offset)
+db_result_t db_chat_get_my_history(db_t* db, uint64_t user_uid, size_t offset, db_chat_preview_LIST_t** out_chats)
 {
+    if (!db || !out_chats || !user_uid)
+        return DB_ERROR;
+
+    *out_chats = NULL;
     db_result_set_t* rc = NULL;
 
     const char* query = "SELECT\n"
@@ -211,28 +215,28 @@ chat_preview_LIST_t* db_chat_get_my_history(db_t* db, uint64_t user_uid, size_t 
     {
         logger_error("db_chat_get_my_history user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
         free_result_set(rc);
-        return NULL;
+        return result;
     }
 
     if (!rc || rc->n_rows == 0)
     {
         free_result_set(rc);
-        return NULL;
+        return DB_OK;
     }
 
-    chat_preview_LIST_t* list = malloc(sizeof(chat_preview_LIST_t));
+    db_chat_preview_LIST_t* list = malloc(sizeof(db_chat_preview_LIST_t));
     if (!list)
     {
-        logger_error("db_chat_get_my_history user_uid={%lu}: malloc failed for chat_preview_LIST_t", user_uid);
+        logger_error("db_chat_get_my_history user_uid={%lu}: malloc failed for db_chat_preview_LIST_t", user_uid);
 
         fprintf(stderr, "malloc failed\n");
 
         free_result_set(rc);
-        return NULL;
+        return DB_ERROR;
     }
 
     list->count = rc->n_rows;
-    list->items = calloc(list->count, sizeof(chat_preview_t));
+    list->items = calloc(list->count, sizeof(db_chat_preview_t));
     if (!list->items)
     {
         logger_error("db_chat_get_my_history user_uid={%lu}: calloc failed for list->items", user_uid);
@@ -241,12 +245,12 @@ chat_preview_LIST_t* db_chat_get_my_history(db_t* db, uint64_t user_uid, size_t 
 
         free(list);
         free_result_set(rc);
-        return NULL;
+        return DB_ERROR;
     }
 
     for (size_t i = 0; i < rc->n_rows; i++)
     {
-        chat_preview_t* chat = &list->items[i];
+        db_chat_preview_t* chat = &list->items[i];
 
         chat->id = strtoull(rc->rows[i].columns[0], NULL, 10);
         chat->name = parse_pg_strdup(rc->rows[i].columns[1]);
@@ -259,11 +263,16 @@ chat_preview_LIST_t* db_chat_get_my_history(db_t* db, uint64_t user_uid, size_t 
     }
 
     free_result_set(rc);
-    return list;
+    *out_chats = list;
+    return DB_OK;
 }
 
-chat_preview_LIST_t* db_chat_get_by_username(db_t* db, uint64_t user_uid, const char* username)
+db_result_t db_chat_get_by_username(db_t* db, uint64_t user_uid, const char* username, db_chat_preview_LIST_t** out_chats)
 {
+    if (!db || !out_chats || !user_uid || !username)
+        return DB_ERROR;
+
+    *out_chats = NULL;
     db_result_set_t* rc = NULL;
 
     const char* query = "SELECT\n"
@@ -317,16 +326,16 @@ chat_preview_LIST_t* db_chat_get_by_username(db_t* db, uint64_t user_uid, const 
     {
         logger_error("db_chat_get_by_username user_uid={%lu}: failed to exec sql: %s", user_uid, db_error_message(db));
         free_result_set(rc);
-        return NULL;
+        return result;
     }
 
     if (!rc || rc->n_rows == 0)
     {
         free_result_set(rc);
-        return NULL;
+        return DB_OK;
     }
 
-    chat_preview_LIST_t* list = malloc(sizeof(chat_preview_LIST_t));
+    db_chat_preview_LIST_t* list = malloc(sizeof(db_chat_preview_LIST_t));
     if (!list)
     {
         logger_error("db_chat_get_by_username user_uid={%lu}: malloc failed for list", user_uid);
@@ -334,11 +343,11 @@ chat_preview_LIST_t* db_chat_get_by_username(db_t* db, uint64_t user_uid, const 
         fprintf(stderr, "malloc failed\n");
 
         free_result_set(rc);
-        return NULL;
+        return DB_ERROR;
     }
 
     list->count = rc->n_rows;
-    list->items = calloc(list->count, sizeof(chat_preview_t));
+    list->items = calloc(list->count, sizeof(db_chat_preview_t));
     if (!list->items)
     {
         logger_error("db_chat_get_by_username user_uid={%lu}: calloc failed for list->items", user_uid);
@@ -347,12 +356,12 @@ chat_preview_LIST_t* db_chat_get_by_username(db_t* db, uint64_t user_uid, const 
 
         free(list);
         free_result_set(rc);
-        return NULL;
+        return DB_ERROR;
     }
 
     for (size_t i = 0; i < rc->n_rows; i++)
     {
-        chat_preview_t* chat = &list->items[i];
+        db_chat_preview_t* chat = &list->items[i];
 
         chat->id = strtoull(rc->rows[i].columns[0], NULL, 10);
         chat->name = parse_pg_strdup(rc->rows[i].columns[1]);
@@ -365,11 +374,16 @@ chat_preview_LIST_t* db_chat_get_by_username(db_t* db, uint64_t user_uid, const 
     }
 
     free_result_set(rc);
-    return list;
+    *out_chats = list;
+    return DB_OK;
 }
 
-chat_member_LIST_t* db_chat_get_members_by_chat_id(db_t* db, uint64_t chat_id, uint64_t user_uid)
+db_result_t db_chat_get_members_by_chat_id(db_t* db, uint64_t chat_id, uint64_t user_uid, db_chat_member_LIST_t** out_members)
 {
+    if (!db || !out_members || !chat_id || !user_uid)
+        return DB_ERROR;
+
+    *out_members = NULL;
     db_result_set_t* rc = NULL;
 
     const char* query = "SELECT\n"
@@ -391,16 +405,16 @@ chat_member_LIST_t* db_chat_get_members_by_chat_id(db_t* db, uint64_t chat_id, u
     {
         logger_error("db_chat_get_members_by_chat_id chat_id={%lu} user_uid={%lu}: failed to exec sql: %s", chat_id, user_uid, db_error_message(db));
         free_result_set(rc);
-        return NULL;
+        return result;
     }
 
     if (!rc || rc->n_rows == 0)
     {
         free_result_set(rc);
-        return NULL;
+        return DB_OK;
     }
 
-    chat_member_LIST_t* list = malloc(sizeof(chat_member_LIST_t));
+    db_chat_member_LIST_t* list = malloc(sizeof(db_chat_member_LIST_t));
     if (!list)
     {
         logger_error("db_chat_get_members_by_chat_id chat_id={%lu} user_uid={%lu}: malloc failed for list", chat_id, user_uid);
@@ -408,7 +422,7 @@ chat_member_LIST_t* db_chat_get_members_by_chat_id(db_t* db, uint64_t chat_id, u
         fprintf(stderr, "malloc failed\n");
 
         free_result_set(rc);
-        return NULL;
+        return DB_ERROR;
     }
 
     list->count = rc->n_rows;
@@ -421,7 +435,7 @@ chat_member_LIST_t* db_chat_get_members_by_chat_id(db_t* db, uint64_t chat_id, u
 
         free(list);
         free_result_set(rc);
-        return NULL;
+        return DB_ERROR;
     }
 
     for (size_t i = 0; i < rc->n_rows; i++)
@@ -430,7 +444,8 @@ chat_member_LIST_t* db_chat_get_members_by_chat_id(db_t* db, uint64_t chat_id, u
     }
 
     free_result_set(rc);
-    return list;
+    *out_members = list;
+    return DB_OK;
 }
 
 bool db_chat_get_member_exists_by_chat_id(db_t* db, uint64_t chat_id, uint64_t user_uid)
@@ -475,8 +490,12 @@ bool db_chat_get_member_exists_by_chat_id(db_t* db, uint64_t chat_id, uint64_t u
     return exists;
 }
 
-chat_setting_t* db_chat_get_setting_by_chat_id(db_t* db, uint64_t chat_id)
+db_result_t db_chat_get_setting_by_chat_id(db_t* db, uint64_t chat_id, db_chat_setting_t** out_setting)
 {
+    if (!db || !out_setting || !chat_id)
+        return DB_ERROR;
+
+    *out_setting = NULL;
     db_result_set_t* rc = NULL;
 
     const char* query = "SELECT * FROM chat_settings WHERE chat_id = $1";
@@ -492,16 +511,16 @@ chat_setting_t* db_chat_get_setting_by_chat_id(db_t* db, uint64_t chat_id)
     {
         logger_error("db_chat_get_setting_by_chat_id chat_id={%lu}: failed to exec sql: %s", chat_id, db_error_message(db));
         free_result_set(rc);
-        return NULL;
+        return result;
     }
 
     if (!rc || rc->n_rows == 0)
     {
         free_result_set(rc);
-        return NULL;
+        return DB_OK;
     }
 
-    chat_setting_t* chat_setting = malloc(sizeof(chat_setting_t));
+    db_chat_setting_t* chat_setting = malloc(sizeof(db_chat_setting_t));
     if (!chat_setting)
     {
         logger_error("db_chat_get_setting_by_chat_id chat_id={%lu}: malloc failed for chat_setting", chat_id);
@@ -509,10 +528,10 @@ chat_setting_t* db_chat_get_setting_by_chat_id(db_t* db, uint64_t chat_id)
         fprintf(stderr, "malloc failed\n");
 
         free_result_set(rc);
-        return NULL;
+        return DB_ERROR;
     }
 
-    memset(chat_setting, 0, sizeof(chat_setting_t));
+    memset(chat_setting, 0, sizeof(db_chat_setting_t));
 
     chat_setting->id = strtoull(rc->rows[0].columns[0], NULL, 10);
     chat_setting->created_at = parse_pg_timestamp(rc->rows[0].columns[1]);
@@ -524,7 +543,8 @@ chat_setting_t* db_chat_get_setting_by_chat_id(db_t* db, uint64_t chat_id)
 
     free_result_set(rc);
 
-    return chat_setting;
+    *out_setting = chat_setting;
+    return DB_OK;
 }
 
 db_result_t db_chat_upd_cbackground_by_chat_id(db_t* db, char* cbackground, uint64_t chat_id)

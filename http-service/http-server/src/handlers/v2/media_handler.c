@@ -25,7 +25,7 @@ void media_upload_in_chat_handler_v2(chttpx_request_t* req, chttpx_response_t* r
 
     char* s3_key = NULL;
     bool remove_uploaded_file = false;
-    message_t* message = NULL;
+    db_message_t* message = NULL;
 
     s3_config_t s3_config = {0};
 
@@ -87,10 +87,10 @@ void media_upload_in_chat_handler_v2(chttpx_request_t* req, chttpx_response_t* r
 
     const char* mime_file_type = map_mime_to_msg_type(file->content_type);
 
-    message = calloc(1, sizeof(message_t));
+    message = calloc(1, sizeof(db_message_t));
     if (!message)
     {
-        logger_error("media_upload_in_chat_handler_v2 req={%s}: calloc failed for message_t", req->request_id);
+        logger_error("media_upload_in_chat_handler_v2 req={%s}: calloc failed for db_message_t", req->request_id);
         *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
         goto cleanup;
     }

@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-db_result_t db_user_block_get_active(db_t* db, uint64_t user_uid, user_block_t** out_block)
+db_result_t db_user_block_get_active(db_t* db, uint64_t user_uid, db_user_block_t** out_block)
 {
     if (!db || !out_block || !user_uid)
         return DB_ERROR;
@@ -40,7 +40,7 @@ db_result_t db_user_block_get_active(db_t* db, uint64_t user_uid, user_block_t**
         return DB_OK;
     }
 
-    user_block_t* block = calloc(1, sizeof(*block));
+    db_user_block_t* block = calloc(1, sizeof(*block));
     if (!block)
     {
         free_result_set(rc);
@@ -105,7 +105,7 @@ db_result_t db_user_block_revoke_active(db_t* db, uint64_t user_uid, uint64_t re
     return execute_sql(db, query, params, 3);
 }
 
-void db_user_block_free(user_block_t* block)
+void db_user_block_free(db_user_block_t* block)
 {
     if (!block)
         return;

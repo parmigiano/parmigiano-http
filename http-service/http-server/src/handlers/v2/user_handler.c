@@ -192,7 +192,7 @@ void user_get_profile_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     }
 
     /* DB. get user info */
-    user_info_t* user = NULL;
+    db_user_info_t* user = NULL;
 
     uint64_t user_uid = 0;
     if (!cHTTPX_ParamU64(req, "user_uid", &user_uid))
@@ -201,7 +201,10 @@ void user_get_profile_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         goto cleanup;
     }
 
-    user = db_user_info_get_by_uid(app_context->db, user_uid);
+    db_result_t user_result = db_user_info_get_by_uid(app_context->db, user_uid, &user);
+    if (db_reply_result(req, res, user_result))
+        goto cleanup;
+
     if (!user)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusNotFound, cHTTPX_i18n_t("error.user-not-found", req->language));
@@ -245,7 +248,7 @@ void user_update_profile_handler_v2(chttpx_request_t* req, chttpx_response_t* re
         return;
     }
 
-    user_profile_update_t payload = {0};
+    db_user_profile_update_t payload = {0};
     bool username_visible = false;
     bool email_visible = false;
     bool phone_visible = false;

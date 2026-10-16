@@ -3,10 +3,6 @@
 
 #include "rabbitmq.h"
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-
 typedef enum {
     RABBITMQ_ROUTE_MODERATION = 0,
 } rabbitmq_route_id_t;

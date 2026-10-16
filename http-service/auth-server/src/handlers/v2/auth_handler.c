@@ -50,7 +50,7 @@ typedef struct
     int code;
 } auth_verify_t;
 
-static int user_has_password(const user_core_t* user)
+static int user_has_password(const db_user_core_t* user)
 {
     return user && user->password && user->password[0] != '\0';
 }
@@ -200,7 +200,7 @@ void auth_login_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     };
 
     /* DB. get user core */
-    user_core_t* user = NULL;
+    db_user_core_t* user = NULL;
 
     if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))
         return;
@@ -280,15 +280,15 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     };
 
     /* DB. get user core */
-    user_core_t* user = NULL;
+    db_user_core_t* user = NULL;
     char* password_hash = NULL;
 
     redis_auth_token_status_t token_status = REDIS_AUTH_TOKEN_ERROR;
 
-    user_core_t* user_core = NULL;
-    user_profile_t* user_profile = NULL;
-    user_profile_access_t* user_profile_access = NULL;
-    user_active_t* user_active = NULL;
+    db_user_core_t* user_core = NULL;
+    db_user_profile_t* user_profile = NULL;
+    db_user_profile_access_t* user_profile_access = NULL;
+    db_user_active_t* user_active = NULL;
 
     if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))
         return;
@@ -311,7 +311,10 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         return;
 
     /* Check user is exists */
-    user = db_user_core_get_by_email(app_context->db, payload.email);
+    db_result_t exists = db_user_core_lookup_by_email(app_context->db, payload.email, &user);
+    if (db_reply_result(req, res, exists))
+        goto cleanup;
+
     if (user)
     {
         *res = cHTTPX_ResError(cHTTPX_StatusBadRequest, cHTTPX_i18n_t("error.user-already-registered", req->language));
@@ -351,10 +354,10 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     uid = (uid % 9000000000ULL) + 1000000000ULL;
 
     /* calloc user_core */
-    user_core = calloc(1, sizeof(user_core_t));
+    user_core = calloc(1, sizeof(db_user_core_t));
     if (!user_core)
     {
-        logger_error("auth_create_handler_v2 req={%s}: calloc failed for user_core_t", req->request_id);
+        logger_error("auth_create_handler_v2 req={%s}: calloc failed for db_user_core_t", req->request_id);
 
         *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
 
@@ -366,10 +369,10 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     user_core->password = password_hash ? strdup(password_hash) : NULL;
 
     /* calloc user_profile */
-    user_profile = calloc(1, sizeof(user_profile_t));
+    user_profile = calloc(1, sizeof(db_user_profile_t));
     if (!user_profile)
     {
-        logger_error("auth_create_handler_v2 req={%s}: calloc failed for user_profile_t", req->request_id);
+        logger_error("auth_create_handler_v2 req={%s}: calloc failed for db_user_profile_t", req->request_id);
 
         *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
 
@@ -381,10 +384,10 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     user_profile->avatar = NULL;
 
     /* calloc user_profile_access */
-    user_profile_access = calloc(1, sizeof(user_profile_access_t));
+    user_profile_access = calloc(1, sizeof(db_user_profile_access_t));
     if (!user_profile_access)
     {
-        logger_error("auth_create_handler_v2 req={%s}: calloc failed for user_profile_access_t", req->request_id);
+        logger_error("auth_create_handler_v2 req={%s}: calloc failed for db_user_profile_access_t", req->request_id);
 
         *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
 
@@ -396,10 +399,10 @@ void auth_create_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
     user_profile_access->phone_visible = false;
 
     /* calloc user_active */
-    user_active = calloc(1, sizeof(user_active_t));
+    user_active = calloc(1, sizeof(db_user_active_t));
     if (!user_active)
     {
-        logger_error("auth_create_handler_v2 req={%s}: calloc failed for user_active_t", req->request_id);
+        logger_error("auth_create_handler_v2 req={%s}: calloc failed for db_user_active_t", req->request_id);
 
         *res = cHTTPX_ResError(cHTTPX_StatusInternalServerError, cHTTPX_i18n_t("error.something-went-wrong", req->language));
 
@@ -488,7 +491,7 @@ void auth_verify_handler_v2(chttpx_request_t* req, chttpx_response_t* res)
         chttpx_validation_integer("code", &payload.code, true),
     };
 
-    user_core_t* user = NULL;
+    db_user_core_t* user = NULL;
 
     if (!bind_json_i18n(req, res, fields, CHTTPX_ARRAY_LEN(fields)))
         return;

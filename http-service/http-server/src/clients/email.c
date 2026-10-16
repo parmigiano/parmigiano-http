@@ -123,20 +123,32 @@ int send_email(const char* to, const char* subject, const char* body, const char
     rfc2822_date(date, sizeof(date));
     generate_message_id(message_id, sizeof(message_id), smtp_domain);
 
-    char payload[4096];
-    snprintf(payload, sizeof(payload),
-             "Date: %s\r\n"
-             "To: %s\r\n"
-             "From: %s\r\n"
-             "Cc: %s\r\n"
-             "Message-ID: %s\r\n"
-             "Subject: %s\r\n"
-             "Content-Type: text/html; charset=UTF-8\r\n"
-             "\r\n"
-             "%s\r\n",
-             date, to, smtp_email, cc ? cc : "", message_id, subject, body);
+    size_t body_len = body ? strlen(body) : 0;
 
-    struct upload_status upload_ctx = {payload, 0, strlen(payload)};
+    size_t payload_size = body_len + 1024;
+    char* payload = malloc(payload_size);
+    
+    if (!payload)
+        return 1;
+
+    int written = snprintf(payload, payload_size,
+                           "Date: %s\r\n"
+                           "To: %s\r\n"
+                           "From: %s\r\n"
+                           "Cc: %s\r\n"
+                           "Message-ID: %s\r\n"
+                           "Subject: %s\r\n"
+                           "Content-Type: text/html; charset=UTF-8\r\n"
+                           "\r\n"
+                           "%s\r\n",
+                           date, to, smtp_email, cc ? cc : "", message_id, subject, body ? body : "");
+    if (written < 0 || (size_t)written >= payload_size)
+    {
+        free(payload);
+        return 1;
+    }
+
+    struct upload_status upload_ctx = {payload, 0, (size_t)written};
 
     curl = curl_easy_init();
     if (curl)
@@ -180,5 +192,6 @@ int send_email(const char* to, const char* subject, const char* body, const char
         curl_easy_cleanup(curl);
     }
 
+    free(payload);
     return (int)res;
 }
