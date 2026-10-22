@@ -5,6 +5,7 @@
 #include "rabbitmq_app.h"
 #include "utilities.h"
 #include "middlewarex.h"
+#include "cron/jobs.h"
 #include "redis/redis.h"
 #include "postgres/migrate.h"
 
@@ -112,6 +113,14 @@ void http_init(void)
 
     run_migrations(app_context->db);
 
+	/* Initial cron */
+	if (cron_init(app_context) != 0)
+	{
+		logger_error("http_init: failed to start cron");
+		_http_cleanup();
+		return;
+	}
+
     /* Load in memory GeoIP */
     int status = MMDB_open("/usr/local/share/GeoIP/GeoLite2-Country.mmdb", MMDB_MODE_MMAP, &app_context->geoip);
     if (status != MMDB_SUCCESS)
@@ -158,6 +167,8 @@ static void _http_cleanup(void)
 {
     if (!app_context)
         return;
+
+	cron_shutdown();
 
     /* RabbitMQ */
     rabbitmq_runtime_stop(app_context->rabbitmq);

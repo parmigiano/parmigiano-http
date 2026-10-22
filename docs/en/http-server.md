@@ -62,7 +62,7 @@ Used on user-facing text fields (e.g. profile update, group names):
 |-------|----------|
 | Boot / servers | `src/httpx.c` |
 | Routes | `src/routes/routes.c` |
-| Migrations | `src/storage/postgres/migrations/` + `migrate.c` |
+| Migrations | `../share/postgres/migrations/` + `../share/postgres/src/migrate.c` |
 | RabbitMQ runtime | `src/rabbitmq/*` |
 | Auth middleware | `src/middlewares/authenticated.c` (loads user from Redis session) |
 

@@ -2,24 +2,28 @@ TARGET=server-http
 
 CC = gcc
 # CFLAGS = -fsanitize=address -fno-omit-frame-pointer -g -O1 -Wall -Wextra -O2 -Iinclude -I/usr/include/postgresql -I/usr/local/include/libchttpx -I/usr/include/hiredis
-CFLAGS = -Wall -Wextra -O2 -Iinclude -I$(SHARE_POSTGRES)/include -I$(SHARE_REDIS)/include -I/usr/local/include -I/usr/include/postgresql -I/usr/include/hiredis
+CFLAGS = -Wall -Wextra -O2 -Iinclude -I$(SHARE_POSTGRES)/include -I$(SHARE_REDIS)/include -I$(SHARE_CRON)/include -I/usr/local/include -I/usr/include/postgresql -I/usr/include/hiredis
 CLANG_FORMAT = clang-format
 
 OBJDIR = .out
 BINDIR = .build
 SHARE_POSTGRES = ../share/postgres
 SHARE_REDIS = ../share/redis
+SHARE_CRON = ../share/cron
 LIN_LDFLAGS = -pthread -luuid -lchttpx -lpq -lcrypto -ls3 -lcurl -lssl -largon2 -lhiredis -lcjson -lmaxminddb -lrabbitmq
 WIN_LDFLAGS = -lws2_32
 
 LIN_SRCS = $(filter-out ./lib/cjson/cJSON.c, $(shell find . -name '*.c'))
 SHARE_SRCS = $(wildcard $(SHARE_POSTGRES)/src/*.c)
 SHARE_REDIS_SRCS = $(wildcard $(SHARE_REDIS)/src/*.c)
-WIN_SRCS = $(wildcard *.c) $(wildcard */*.c) $(wildcard */*/*.c) $(SHARE_SRCS) $(SHARE_REDIS_SRCS)
+SHARE_CRON_SRCS = $(wildcard $(SHARE_CRON)/src/*.c) $(wildcard $(SHARE_CRON)/vendor/ccronexpr/*.c)
+SHARE_CRON_FORMAT_SRCS = $(wildcard $(SHARE_CRON)/src/*.c)
+WIN_SRCS = $(wildcard *.c) $(wildcard */*.c) $(wildcard */*/*.c) $(SHARE_SRCS) $(SHARE_REDIS_SRCS) $(SHARE_CRON_SRCS)
 
 LIN_OBJS = $(patsubst %.c,$(OBJDIR)/%.o,$(LIN_SRCS))
 SHARE_OBJS = $(patsubst $(SHARE_POSTGRES)/%.c,$(OBJDIR)/share/%.o,$(SHARE_SRCS))
 SHARE_REDIS_OBJS = $(patsubst $(SHARE_REDIS)/%.c,$(OBJDIR)/share/%.o,$(SHARE_REDIS_SRCS))
+SHARE_CRON_OBJS = $(patsubst $(SHARE_CRON)/%.c,$(OBJDIR)/share/cron/%.o,$(SHARE_CRON_SRCS))
 WIN_OBJS = $(patsubst %.c,$(OBJDIR)/%.o,$(WIN_SRCS))
 
 # LINux build
@@ -27,9 +31,9 @@ WIN_OBJS = $(patsubst %.c,$(OBJDIR)/%.o,$(WIN_SRCS))
 
 lin: $(BINDIR)/$(TARGET)
 
-$(BINDIR)/$(TARGET): $(LIN_OBJS) $(SHARE_OBJS) $(SHARE_REDIS_OBJS)
+$(BINDIR)/$(TARGET): $(LIN_OBJS) $(SHARE_OBJS) $(SHARE_REDIS_OBJS) $(SHARE_CRON_OBJS)
 	@mkdir -p $(BINDIR)
-	$(CC) $(CFLAGS) -o $@ $(LIN_OBJS) $(SHARE_OBJS) $(SHARE_REDIS_OBJS) $(LIN_LDFLAGS)
+	$(CC) $(CFLAGS) -o $@ $(LIN_OBJS) $(SHARE_OBJS) $(SHARE_REDIS_OBJS) $(SHARE_CRON_OBJS) $(LIN_LDFLAGS)
 
 $(OBJDIR)/%.o: %.c
 	@mkdir -p $(dir $@)
@@ -40,6 +44,10 @@ $(OBJDIR)/share/%.o: $(SHARE_POSTGRES)/%.c
 	$(CC) $(CFLAGS) -fPIC -c $< -o $@
 
 $(SHARE_REDIS_OBJS): $(OBJDIR)/share/%.o: $(SHARE_REDIS)/%.c
+	@mkdir -p $(dir $@)
+	$(CC) $(CFLAGS) -fPIC -c $< -o $@
+
+$(OBJDIR)/share/cron/%.o: $(SHARE_CRON)/%.c
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -fPIC -c $< -o $@
 
@@ -67,7 +75,7 @@ win-run: win
 
 lin-format:
 	@echo ">> Formatting clang source files"
-	$(CLANG_FORMAT) -i $(LIN_SRCS) $(SHARE_SRCS) $(SHARE_REDIS_SRCS)
+	$(CLANG_FORMAT) -i $(LIN_SRCS) $(SHARE_SRCS) $(SHARE_REDIS_SRCS) $(SHARE_CRON_FORMAT_SRCS)
 
 # WINdows format
 # -

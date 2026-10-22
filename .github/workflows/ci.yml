@@ -39,7 +39,8 @@ jobs:
             -I include \
             -I ../share/postgres/include \
             -I ../share/redis/include \
-            src/ include/ ../share/postgres/src ../share/postgres/include ../share/redis/src ../share/redis/include
+            -I ../share/cron/include \
+            src/ include/ ../share/postgres/src ../share/postgres/include ../share/redis/src ../share/redis/include ../share/cron/src ../share/cron/include
 
       - name: Run cppcheck (auth-server)
         working-directory: http-service/auth-server
@@ -99,12 +100,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Validate migration names and sequence
+      - name: Validate migration names and order
         shell: bash
         run: |
           set -euo pipefail
 
-          dir="http-service/http-server/src/storage/postgres/migrations"
+          dir="http-service/share/postgres/migrations"
           mapfile -t migrations < <(find "$dir" -maxdepth 1 -type f -name '*.sql' -printf '%f\n' | sort)
 
           if (( ${#migrations[@]} == 0 )); then
@@ -112,7 +113,7 @@ jobs:
             exit 1
           fi
 
-          expected=1
+          previous=0
           for migration in "${migrations[@]}"; do
             if [[ ! "$migration" =~ ^([0-9]{3})_[a-z0-9_]+\.sql$ ]]; then
               echo "Invalid migration filename: $migration"
@@ -120,8 +121,8 @@ jobs:
             fi
 
             version=$((10#${BASH_REMATCH[1]}))
-            if (( version != expected )); then
-              printf 'Migration sequence error: expected %03d, got %03d (%s)\n' "$expected" "$version" "$migration"
+            if (( version <= previous )); then
+              printf 'Migration order error: version %03d must be greater than %03d (%s)\n' "$version" "$previous" "$migration"
               exit 1
             fi
 
@@ -130,7 +131,7 @@ jobs:
               exit 1
             fi
 
-            ((expected += 1))
+            previous=$version
           done
 
       - name: Prevent editing applied migration history
@@ -141,12 +142,59 @@ jobs:
         run: |
           set -euo pipefail
 
-          migration_dir="http-service/http-server/src/storage/postgres/migrations/"
+          migration_dir="http-service/share/postgres/migrations/"
+          legacy_migration_dir="http-service/http-server/src/storage/postgres/migrations/"
           git fetch origin "$BASE_REF" --depth=1
 
-          changed_existing=$(git diff --name-status "origin/$BASE_REF...HEAD" -- "$migration_dir" | awk '$1 !~ /^A/ {print}')
-          if [[ -n "$changed_existing" ]]; then
+          base="origin/$BASE_REF"
+          mapfile -t applied_migrations < <(
+            git ls-tree -r --name-only "$base" -- "$migration_dir" "$legacy_migration_dir" |
+              awk '/\.sql$/' |
+              sort
+          )
+
+          declare -A applied_names=()
+          highest_applied_version=0
+          violations=()
+
+          for base_path in "${applied_migrations[@]}"; do
+            filename=${base_path##*/}
+            current_path="${migration_dir}${filename}"
+            applied_names["$filename"]=1
+
+            version=${filename%%_*}
+            version=$((10#$version))
+            if (( version > highest_applied_version )); then
+              highest_applied_version=$version
+            fi
+
+            if [[ ! -f "$current_path" ]]; then
+              violations+=("deleted: $filename")
+              continue
+            fi
+
+            base_hash=$(git rev-parse "$base:$base_path")
+            current_hash=$(git hash-object "$current_path")
+            if [[ "$base_hash" != "$current_hash" ]]; then
+              violations+=("modified: $filename")
+            fi
+          done
+
+          for current_path in "$migration_dir"*.sql; do
+            filename=${current_path##*/}
+            if [[ -n "${applied_names[$filename]+x}" ]]; then
+              continue
+            fi
+
+            version=${filename%%_*}
+            version=$((10#$version))
+            if (( version <= highest_applied_version )); then
+              violations+=("new migration must follow version $(printf '%03d' "$highest_applied_version"): $filename")
+            fi
+          done
+
+          if (( ${#violations[@]} > 0 )); then
             echo "Existing migrations are immutable. Add a new migration instead:"
-            echo "$changed_existing"
+            printf '  %s\n' "${violations[@]}"
             exit 1
           fi

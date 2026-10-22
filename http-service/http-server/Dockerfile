@@ -76,7 +76,7 @@ COPY --from=builder /usr/local/share/GeoIP/GeoLite2-Country.mmdb /usr/local/shar
 COPY --from=builder /app/.build/server-http .
 COPY --from=builder /app/docs ./docs
 COPY --from=builder /app/src/infra ./src/infra
-COPY --from=builder /app/src/storage/postgres/migrations ./src/storage/postgres/migrations
+COPY --from=builder /share/postgres/migrations /share/postgres/migrations
 
 RUN ldconfig \
     && ldd /app/server-http > /tmp/server-http-libraries.txt \

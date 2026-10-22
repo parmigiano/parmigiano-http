@@ -84,7 +84,7 @@ void http_init(void)
         return;
     }
 
-    /* Database connection (migrations are owned by http-server) */
+    /* Database connection (migrations are run by http-server) */
     app_context->db = db_open_env();
     if (!app_context->db)
     {

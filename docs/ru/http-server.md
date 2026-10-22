@@ -62,7 +62,7 @@ Swagger GUI: `http://localhost:8080/api/v2/doc.api/swagger/gui`
 |-------|-----|
 | Старт / серверы | `src/httpx.c` |
 | Роуты | `src/routes/routes.c` |
-| Миграции | `src/storage/postgres/migrations/` + `migrate.c` |
+| Миграции | `../share/postgres/migrations/` + `../share/postgres/src/migrate.c` |
 | RabbitMQ | `src/rabbitmq/*` |
 | Auth middleware | `src/middlewares/authenticated.c` (пользователь из Redis-сессии) |
 

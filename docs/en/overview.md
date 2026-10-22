@@ -100,7 +100,7 @@ Auth-server also calls **profanity** (registration / profile-like text fields) a
 
 ## Shared dependencies
 
-- **PostgreSQL** — users, chats, messages, moderation tables. Each process keeps its own connection pool (`DB_MAX_OPEN`, default 16). Pool and query helpers live in `http-service/share/postgres`. Table access stays in each server's `storage/postgres/store`. Migrations are owned by **http-server only**. Auth-server connects to the same DB but does **not** run migrations.
+- **PostgreSQL** — users, chats, messages, moderation tables. Each process keeps its own connection pool (`DB_MAX_OPEN`, default 16). Pool, query helpers, and migrations live in `http-service/share/postgres`. Table access stays in each server's `storage/postgres/store`. Migrations are run by **http-server only**. Auth-server connects to the same DB but does **not** run migrations.
 - **Redis** — sessions, email verify codes, rate limits, email-confirm flags. Each process keeps its own connection pool (`REDIS_MAX_OPEN`, default 16) in `http-service/share/redis`. Key commands stay in each server's `storage/redis`.
 - **S3** — avatars / private media.
 - **SMTP** — confirmation emails (auth-server).
@@ -118,7 +118,7 @@ Auth-server also calls **profanity** (registration / profile-like text fields) a
 |------|--------|
 | Auth routes / handlers | `http-service/auth-server` |
 | Users / chats / media | `http-service/http-server` |
-| Shared Postgres pool / queries | `http-service/share/postgres` |
+| Shared Postgres pool / queries / migrations | `http-service/share/postgres` |
 | Shared Redis pool | `http-service/share/redis` |
 | Image thresholds | `nsfw-service` + compose env |
 | Bad-words languages / threshold | `profanity-service` + compose env |

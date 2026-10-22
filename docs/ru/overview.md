@@ -100,7 +100,7 @@ Auth-server также ходит в **profanity** (имя/username при ре�
 
 ## Общие зависимости
 
-- **PostgreSQL** — пользователи, чаты, сообщения, модерация. У каждого процесса свой пул соединений (`DB_MAX_OPEN`, по умолчанию 16). Пул и выполнение запросов лежат в `http-service/share/postgres`. Доступ к таблицам остаётся в `storage/postgres/store` каждого сервера. Миграции запускает **только http-server**. Auth-server подключается к той же БД, но миграции **не** гоняет.
+- **PostgreSQL** — пользователи, чаты, сообщения, модерация. У каждого процесса свой пул соединений (`DB_MAX_OPEN`, по умолчанию 16). Пул, выполнение запросов и миграции лежат в `http-service/share/postgres`. Доступ к таблицам остаётся в `storage/postgres/store` каждого сервера. Миграции запускает **только http-server**. Auth-server подключается к той же БД, но миграции **не** гоняет.
 - **Redis** — сессии, коды подтверждения почты, лимиты, флаги email-confirm. У каждого процесса свой пул (`REDIS_MAX_OPEN`, по умолчанию 16) в `http-service/share/redis`. Команды по ключам остаются в `storage/redis` каждого сервера.
 - **S3** — аватары / приватные медиа.
 - **SMTP** — письма с кодом (auth-server).
@@ -118,7 +118,7 @@ Auth-server также ходит в **profanity** (имя/username при ре�
 |--------|-------|
 | Auth-роуты / хендлеры | `http-service/auth-server` |
 | Users / chats / media | `http-service/http-server` |
-| Общий Postgres-пул / запросы | `http-service/share/postgres` |
+| Общий Postgres-пул / запросы / миграции | `http-service/share/postgres` |
 | Общий пул Redis | `http-service/share/redis` |
 | Пороги картинок | `nsfw-service` + env в compose |
 | Языки / порог мата | `profanity-service` + env в compose |
